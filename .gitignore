@@ -361,3 +361,8 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/FoodTracker/EatingPatch.cs
+/FoodTracker/FinalizeIngestPatch.cs
+/FoodTracker/FoodTrackerMeal.cs
+/FoodTracker/InterruptedEatingRecovery.cs
+/FoodTracker/MealReplacement.cs
