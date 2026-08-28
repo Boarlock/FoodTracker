@@ -8,22 +8,27 @@ namespace FoodTracker
 {
     public static class DynamicMealDefFactory
     {
-        private const string Prefix = "FoodTracker_";
+        public const string Prefix = "FoodTracker_";
 
         public static ThingDef CreateTrackerMeal(ThingDef parentDef)
         {
             if (parentDef == null)
                 return null;
 
-            // Check to see if it's already a FoodTracker Meal Def
-            if (parentDef.defName.StartsWith("FoodTracker_"))
-                return parentDef;
-
             // Make the new tracker def name
             string newDefName = Prefix + parentDef.defName;
 
+            // Already a generated FoodTracker def.
+            if (parentDef.defName.StartsWith(Prefix))
+                return parentDef;
+
+            // Look for the canonical generated def for the ORIGINAL food.
+            ThingDef existingDef = DefDatabase<ThingDef>.GetNamedSilentFail(newDefName);
+            if (existingDef != null)
+                return existingDef;
+
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"ThingDef creation is underway! {parentDef.defName} has been received, {newDefName} will be created.");
+                Log.Message($"[FoodTracker] ThingDef cloning is underway. {parentDef.defName} has been received, {newDefName} will be created.");
 
             // Clone the ThingDef with all of it's references, fields, data, etc..
             ThingDef childDef = Gen.MemberwiseClone(parentDef);
@@ -50,7 +55,7 @@ namespace FoodTracker
             DefDatabase<ThingDef>.Add(childDef);
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker] {childDef.defName} has been successfully created.");
+                Log.Message($"[FoodTracker] ThingDef {childDef.defName} has been successfully created.");
 
             return childDef;
         }

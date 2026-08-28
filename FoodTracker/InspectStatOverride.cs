@@ -15,7 +15,7 @@ namespace FoodTracker
             if (thing == null || thing.Destroyed)
                 return true;
 
-            if (thing.def.defName.StartsWith("FoodTracker_") == false)
+            if (thing.def.defName.StartsWith(DynamicMealDefFactory.Prefix) == false)
                 return true;
 
             CompPartialNutrition comp = thing.TryGetComp<CompPartialNutrition>();

@@ -9,10 +9,9 @@ namespace FoodTracker
         public static void HandleDestroyedMeal(IngestionState state)
         {
             // Validate inputs
-            if (state == null || state.Pawn == null || state.Food == null || !state.Food.Destroyed)
+            if (state == null || state.Pawn == null || state.MealDef == null)
             {
-                Log.Warning($"[FoodTracker] Inputs are not valid. Pawn: {state?.Pawn?.Label ?? "NULL"}, Food: {state?.MealDef?.defName}, " +
-                    $"Food ID: {state?.Food?.thingIDNumber ?? 0}, Food Destroyed: {state?.Food?.Destroyed ?? true}");
+                Log.Warning($"[FoodTracker] Inputs are not valid. State Null: {state == null}, Pawn Null: {state.Pawn == null}, ThingDef Null: {state.MealDef == null}");
 
                 return;
             }
@@ -58,7 +57,7 @@ namespace FoodTracker
             // If surviving stack cannot be found 
             if (survivingStack == null)
             {
-                Log.Warning($"[FoodTracker] Could not find a surviving {mealDef.defName} stack at {state.FoodCell}.");
+                Log.Warning($"[FoodTracker] Could not find a surviving {state?.MealDef?.defName ?? "NULL"}, {state?.Food?.thingIDNumber ?? 0} stack at {state.FoodCell}.");
 
                 return;
             }
@@ -74,7 +73,7 @@ namespace FoodTracker
 
             if (partialMeal == null)
             {
-                Log.Warning($"[FoodTracker] Failed to make partial {partialMeal?.def.defName ?? "NULL"} near {state.Pawn.Label}. Food ID: {partialMeal?.thingIDNumber ?? 0}");
+                Log.Warning($"[FoodTracker] Failed to make partial {partialMeal?.def.defName ?? "NULL"}, {partialMeal?.thingIDNumber ?? 0} near {state.Pawn.Label}");
 
                 return;
             }
@@ -86,10 +85,9 @@ namespace FoodTracker
 
         public static void HandleDestroyedBatchFood(IngestionState state)
         {
-            if (state == null || state.Pawn == null || state.Food == null || !state.Food.Destroyed)
+            if (state == null || state.Pawn == null || state.MealDef == null)
             {
-                Log.Warning($"[FoodTracker] Inputs are not valid. Pawn: {state?.Pawn?.Label ?? "NULL"}, Food: {state?.MealDef?.defName}, " +
-                    $"Food ID: {state?.Food?.thingIDNumber ?? 0}, Food Destroyed: {state?.Food?.Destroyed ?? true}");
+                Log.Warning($"[FoodTracker] Inputs are not valid. State Null: {state == null}, Pawn Null: {state.Pawn == null}, ThingDef Null: {state.MealDef == null}");
 
                 return;
             }
@@ -138,7 +136,7 @@ namespace FoodTracker
             // If surviving stack cannot be found 
             if (survivingStack == null)
             {
-                Log.Warning($"[FoodTracker] Could not find a surviving {state.MealDef.defName} stack at {state.FoodCell}.");
+                Log.Warning($"[FoodTracker] Could not find a surviving {state?.MealDef?.defName ?? "NULL"}, {state?.Food?.thingIDNumber ?? 0} stack at {state.FoodCell}.");
 
                 return;
             }
@@ -156,11 +154,9 @@ namespace FoodTracker
 
             if (FoodTrackerSettings.Verbose)
             {
-                Log.Message($"[FoodTracker] Removed {itemsToRemove} item(s) from surviving stack to compensate for vanilla restoration. New Stack Count: {survivingStack?.stackCount ?? 0}");
+                Log.Message($"[FoodTracker] Consumption complete for {state.MealDef.defName}, Food ID: {state.Food.thingIDNumber}. " +
+                        $"Starting Stack: {state.StartingStackCount}, Items Eaten: {itemsEaten}, Ending Stack: {survivingStack.stackCount}, Nutrition Eaten: {nutritionOnStackEaten:F2}");
             }
-
-
         }
-
     }
 }

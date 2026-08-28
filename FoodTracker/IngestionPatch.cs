@@ -12,14 +12,10 @@ namespace FoodTracker
     public static class ChewIngestiblePatch
     {
 
-        public static void Prefix(
-            Pawn chewer,
-            ref float durationMultiplier,
-            TargetIndex ingestibleInd,
-            ref IngestionState __state)
+        public static void Prefix(Pawn chewer, ref float durationMultiplier, TargetIndex ingestibleInd, ref IngestionState __state)
         {
 
-            // Get food being consumed by current job and count of items to be consumed
+            // Get current job and target food
             Job curJob = chewer.CurJob;
             Thing food = curJob?.GetTarget(ingestibleInd).Thing;
 
@@ -27,15 +23,12 @@ namespace FoodTracker
             if (!FoodTrackingHelpers.ValidateFoodEatingAttempt(chewer, food))
                 return;
 
-            __state = new IngestionState
-            {
-                MealDef = food.def,
-                NutritionAtStart = FoodTrackingHelpers.GetRemainingNutrition(food),
-                NutritionPerItem = food.GetStatValue(StatDefOf.Nutrition),
-                IngestCount = curJob?.count ?? 0
-            };
+            // Get count of items to be consumed and calculate base nutrition per item
+            ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(food.def);
+            float nutritionPerItem = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
+            int ingestCount = curJob?.count ?? 0;
 
-            if (__state.NutritionPerItem <= 0f || __state.IngestCount <= 0)
+            if (nutritionPerItem <= 0f || ingestCount <= 0)
             {
                 Log.Warning($"[FoodTracker] Invalid nutrition or stack: Pawn: {chewer.Label}, Food: {food?.def?.defName ?? "NULL"} " +
                     $"Food ID: {food?.thingIDNumber ?? 0}, Nutrition Per Item: {__state?.NutritionPerItem ?? 0}, Count: {__state?.IngestCount ?? 0}");
@@ -43,9 +36,17 @@ namespace FoodTracker
                 return;
             }
 
-            // Eating time scales with the total nutrition being consumed.
-            if (FoodTrackingHelpers.IsBatchFood(food))
+            // Batch foods don't carry a component, this scales eating duration off total nutrition eaten
+            if (FoodTrackingHelpers.IsBatchFood(food.def))
             {
+                __state = new IngestionState
+                {
+                    MealDef = originalDef,
+                    NutritionPerItem = nutritionPerItem,
+                    StartingStackCount = food.stackCount,
+                    IngestCount = ingestCount
+                };
+
                 float totalNutrition = __state.NutritionPerItem * __state.IngestCount;
 
                 durationMultiplier *= Mathf.Max(0.01f, totalNutrition / 0.9f);
@@ -58,34 +59,52 @@ namespace FoodTracker
                 return;
             }
 
-            ThingDef generatedDef = DynamicMealDefFactory.CreateTrackerMeal(food.def);
+            ThingDef trackerDef = DynamicMealDefFactory.CreateTrackerMeal(food.def);
 
-            // Eating time scales with the nutrition remaining.
-            if (food.def.defName.StartsWith("FoodTracker_"))
+            // If this is not a FoodTracker meal, then it's a full meal. 
+            if (food.TryGetComp<CompPartialNutrition>() == null)
             {
-
-                float remainingFraction = Mathf.Clamp01(FoodTrackingHelpers.GetRemainingNutrition(food) / __state.NutritionPerItem);
-
-                durationMultiplier *= remainingFraction;
+                __state = new IngestionState
+                {
+                    MealDef = originalDef,
+                    TrackerDef = trackerDef,
+                    NutritionAtStart = nutritionPerItem,
+                    NutritionPerItem = nutritionPerItem,
+                    IngestCount = ingestCount
+                };
 
                 if (FoodTrackerSettings.Verbose)
                 {
-                    Log.Message($"[FoodTracker] Meal food detected. Scaling eating duration to {durationMultiplier:P0}");
+                    Log.Message($"[FoodTracker] Non-Tracked meal detected. Not scaling eating duration.");
                 }
 
                 return;
             }
 
-            // Everything else uses vanilla eating duration.
+            // Otherwise it is a tracked meal and we need to calclate remaining nutrition and eating duration
+            __state = new IngestionState
+            {
+                MealDef = food.def,
+                TrackerDef = trackerDef,
+                NutritionAtStart = FoodTrackingHelpers.GetRemainingNutrition(food),
+                NutritionPerItem = nutritionPerItem,
+                IngestCount = ingestCount
+            };
+
+            // Caclulate eating duration based off nutrition at start 
+
+            float remainingFraction = Mathf.Clamp01(FoodTrackingHelpers.GetRemainingNutrition(food) / __state.NutritionPerItem);
+
+            durationMultiplier *= remainingFraction;
+
+            if (FoodTrackerSettings.Verbose)
+            {
+                Log.Message($"[FoodTracker] Tracked meal detected. Scaling eating duration to {durationMultiplier:P0}");
+            }
 
         }
 
-        public static void Postfix(
-            Toil __result,
-            Pawn chewer,
-            float durationMultiplier,
-            TargetIndex ingestibleInd,
-            IngestionState __state)
+        public static void Postfix(Toil __result, Pawn chewer, float durationMultiplier, TargetIndex ingestibleInd, IngestionState __state)
         {
             // If Prefix didn't produce a state, FoodTracker has nothing to track.
             if (__state == null)
@@ -192,7 +211,7 @@ namespace FoodTracker
     {
         public static void Handle(IngestionState state)
         {
-            if (state.MealDef.defName.StartsWith("FoodTracker_") == false)
+            if (state?.Food?.TryGetComp<CompPartialNutrition>() == null)
             {
                 if (FoodTrackerSettings.Verbose)
                     Log.Message($"[FoodTracker] {state?.MealDef.defName ?? "NULL"} is not a tracked partial meal or, has no " +
@@ -210,8 +229,6 @@ namespace FoodTracker
             if (FoodTrackerSettings.Verbose)
                 Log.Message($"[FoodTracker] Nutrition has been exhausted for {state.MealDef.defName}. Nutrition Consumed: " +
                     $"{trueNutritionConsumed:F2}, Food ID: {state.Food.thingIDNumber}");
-
-
         }
     }
 }

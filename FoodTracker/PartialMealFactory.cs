@@ -10,8 +10,8 @@ namespace FoodTracker
             // Validate the input parameters.
             if (state == null || state.Pawn == null || state.Food == null || state.Food.Destroyed)
             {
-                Log.Warning($"[FoodTracker] Inputs are not valid. Pawn: {state?.Pawn?.Label ?? "NULL"}, Food: {state?.Food?.Label ?? "NULL"}, " +
-                    $"Food ID: {state?.Food?.thingIDNumber ?? 0}, Food Def: {state?.Food?.def?.defName ?? "NULL"}, Food Destroyed: {state?.Food?.Destroyed ?? false}");
+                Log.Warning($"[FoodTracker] Inputs are not valid. State Null: {state == null}, Pawn Null: {state?.Pawn == null}, " +
+                    $"Food Null: {state?.Food == null}, Food Destroyed: {state?.Food?.Destroyed ?? false}");
 
                 return null;
             }
@@ -21,7 +21,7 @@ namespace FoodTracker
 
             if (partialDef == null)
             {
-                Log.Warning($"[FoodTracker] No corresponding partial meal found for {state.Food.def.defName}. Food ID: {state.Food.thingIDNumber}.");
+                Log.Warning($"[FoodTracker] No corresponding partial meal found for {state.Food.def.defName}, Food ID: {state.Food.thingIDNumber}.");
 
                 return null;
             }
@@ -31,13 +31,13 @@ namespace FoodTracker
 
             if (FoodTrackerSettings.Verbose)
             {
-                Log.Message($"[FoodTracker] New partial {food.def.defName} created. Food ID: {food.thingIDNumber}");
+                Log.Message($"[FoodTracker] New partial {food.def.defName}, Food ID: {food.thingIDNumber} Thing created.");
             }
 
             // If created item doesn't for any reason contain our component then delete it.
-            if (food.def.defName.StartsWith("FoodTracker_"))
+            if (food.TryGetComp<CompPartialNutrition>() == null)
             {
-                Log.Warning($"[FoodTracker] Component missing from {food.def.defName}. Food ID: {food.thingIDNumber}");
+                Log.Warning($"[FoodTracker] Component missing from {food.def.defName}, Food ID: {food.thingIDNumber}.");
 
                 if (!food.Destroyed)
                 {
@@ -57,18 +57,19 @@ namespace FoodTracker
 
             if (FoodTrackerSettings.Verbose)
             {
-                Log.Message($"[FoodTracker] Preparing to drop partial {food.def.defName}. Remaining Nutrition: {remainingNutrition:F2}, Intended Drop Cell: {dropCell}");
+                Log.Message($"[FoodTracker] Preparing to drop partial {food.def.defName}, Food ID: {food.thingIDNumber}. " +
+                    $"Remaining Nutrition: {remainingNutrition:F2}, Intended Drop Cell: {dropCell}");
             }
 
             if (!GenDrop.TryDropSpawn(food, dropCell, state.Pawn.Map, ThingPlaceMode.Near, out Thing resultingThing))
 
             {
-                Log.Warning($"[FoodTracker] Failed to drop partial {food.def.defName} near {state.Pawn.Label}. Food ID: {food.thingIDNumber}");
+                Log.Warning($"[FoodTracker] Failed to drop partial {food.def.defName}, Food ID: {food.thingIDNumber} near {state.Pawn.Label}.");
 
                 // If the drop failed, don't leave a ghost item in the world. Destroy the partial meal to prevent it from lingering.
                 if (!food.Destroyed)
                 {
-                    Log.Message($"[FoodTracker] Destroying partial {food.def.defName} reference.");
+                    Log.Message($"[FoodTracker] Destroying partial meal.");
 
                     food.Destroy(DestroyMode.Vanish);
                 }
@@ -84,7 +85,8 @@ namespace FoodTracker
 
             if (FoodTrackerSettings.Verbose)
             {
-                Log.Message($"[FoodTracker] {state.MealDef.defName}, {state.Food.thingIDNumber} has been replaced by {resultingThing?.def.defName ?? "NULL"}. Is Tracked: {resultingThing?.def.defName.StartsWith("FoodTracker_")}");
+                Log.Message($"[FoodTracker] {state.MealDef.defName}, {state.Food.thingIDNumber} has been replaced by {resultingThing?.def?.defName ?? "NULL"}, " +
+                    $"{resultingThing?.thingIDNumber ?? 0}. Is Tracked: {!(resultingThing?.TryGetComp<CompPartialNutrition>() == null)}");
             }
 
             // Return the newly created partial meal.
@@ -98,7 +100,7 @@ namespace FoodTracker
             // Validate the input parameters.
             if (state == null || state.Pawn == null || state.MealDef == null)
             {
-                Log.Warning($"[FoodTracker] Inputs are not valid. Pawn: {state?.Pawn?.Label ?? "NULL"}, Food Def: {state?.MealDef?.defName ?? "NULL"}");
+                Log.Warning($"[FoodTracker] Inputs are not valid. State Null: {state == null}, Pawn Null: {state?.Pawn == null}, ThingDef Null: {state?.MealDef == null}");
 
                 return null;
             }
@@ -109,7 +111,7 @@ namespace FoodTracker
             if (partialDef == null)
             {
 
-                Log.Warning($"[FoodTracker] No corresponding partial meal found for {state.MealDef.defName}.");
+                Log.Warning($"[FoodTracker] No corresponding partial meal found for {state?.MealDef?.defName ?? "NULL"}, {state?.Food?.thingIDNumber ?? 0}.");
 
                 return null;
             }
@@ -119,18 +121,18 @@ namespace FoodTracker
 
             if (FoodTrackerSettings.Verbose)
             {
-                Log.Message($"[FoodTracker] New partial {food.def.defName} created. Food ID: {food.thingIDNumber}");
+                Log.Message($"[FoodTracker] New partial {food.def.defName}, {food.thingIDNumber} Thing created.");
             }
 
             // Verify the component exists before attempting to use it.
-            if (food.def.defName.StartsWith("FoodTracker_") == false)
+            if (food.TryGetComp<CompPartialNutrition>() == null)
             {
 
-                Log.Warning($"[FoodTracker] Component missing from {food.def.defName}. Food ID: {food.thingIDNumber}");
+                Log.Warning($"[FoodTracker] Component missing from {food.def.defName}, {food.thingIDNumber}.");
 
                 if (!food.Destroyed)
                 {
-                    Log.Message($"[FoodTracker] Destroying untracked partial {food.def.defName}.");
+                    Log.Message($"[FoodTracker] Destroying untracked partial meal.");
 
                     food.Destroy(DestroyMode.Vanish);
                 }
@@ -143,18 +145,18 @@ namespace FoodTracker
 
             if (FoodTrackerSettings.Verbose)
             {
-                Log.Message($"[FoodTracker] Preparing to drop partial {food.def.defName}. Remaining Nutrition: {remainingNutrition:F2}, " +
-                    $"Intended Drop Cell: {state.FoodCell}, Food ID: {food.thingIDNumber}");
+                Log.Message($"[FoodTracker] Preparing to drop partial {food.def.defName}, {food.thingIDNumber}. " +
+                    $"Remaining Nutrition: {remainingNutrition:F2}, Intended Drop Cell: {state.FoodCell}");
             }
 
             // Drop the new partial meal into the world.
             if (!GenDrop.TryDropSpawn(food, state.FoodCell, state.Pawn.Map, ThingPlaceMode.Near, out Thing resultingThing))
             {
-                Log.Warning($"[FoodTracker] Failed to drop partial {food.def.defName} near {state.Pawn.Label}. Food ID: {food.thingIDNumber}");
+                Log.Warning($"[FoodTracker] Failed to drop partial {food.def.defName}, {food.thingIDNumber} near {state.Pawn.Label}");
 
                 if (!food.Destroyed)
                 {
-                    Log.Message($"[FoodTracker] Destroying partial {food.def.defName} reference.");
+                    Log.Message($"[FoodTracker] Destroying partial meal.");
 
                     food.Destroy(DestroyMode.Vanish);
                 }
@@ -164,8 +166,8 @@ namespace FoodTracker
 
             if (FoodTrackerSettings.Verbose)
             {
-                Log.Message($"[FoodTracker] New partial {resultingThing?.def.defName ?? "NULL"} created successfully. Food ID: {resultingThing?.thingIDNumber ?? 0}, " +
-                    $"Remaining Nutrition: {FoodTrackingHelpers.GetRemainingNutrition(resultingThing):F2}, Is Tracked: {resultingThing?.def.defName.StartsWith("FoodTracker_")}");
+                Log.Message($"[FoodTracker] {state?.MealDef?.defName ?? "NULL"}, {state?.Food?.thingIDNumber ?? 0} has been replaced by {resultingThing?.def?.defName ?? "NULL"}, " +
+                    $"{resultingThing?.thingIDNumber ?? 0}. Is Tracked: {!(resultingThing?.TryGetComp<CompPartialNutrition>() == null)}");
             }
 
             return resultingThing;

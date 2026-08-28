@@ -9,25 +9,27 @@ namespace FoodTracker
         // If nutrition is below this threshold treat as interrupted, otherwise FoodTracker does not interfere with ingestion completion
         public const float MealCompletionThreshold = 0.995f;
 
-        // This method retrieves a ThingDef by its definition name. It returns null if no definition is found with the given name.
-        private static ThingDef Get(string defName)
+        // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def
+        public static ThingDef GetOriginalMealDef(ThingDef foodDef)
         {
-            return DefDatabase<ThingDef>.GetNamedSilentFail(defName);
+            if (foodDef == null)
+                return null;
+
+            if (!foodDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
+                return foodDef;
+
+            string originalDefName = foodDef.defName.Substring(DynamicMealDefFactory.Prefix.Length);
+
+            return DefDatabase<ThingDef>.GetNamedSilentFail(originalDefName);
         }
 
         // Determines if the target food is a batch food item that can be consumed in multiple portions.
-        public static bool IsBatchFood(Thing food)
+        public static bool IsBatchFood(ThingDef foodDef)
         {
-            if (food == null || food.Destroyed)
-            {
-                if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker] Input is not valid. Food: {food?.def?.defName ?? "NULL"}, Food ID: " +
-                        $"{food?.thingIDNumber ?? 0}, Food Destroyed: {food?.Destroyed ?? false}");
-
+            if (foodDef == null || foodDef.ingestible == null)
                 return false;
-            }
 
-            return food.def.ingestible.maxNumToIngestAtOnce != 1;
+            return foodDef.ingestible.maxNumToIngestAtOnce != 1;
         }
 
         public static bool ValidateFoodEatingAttempt(Pawn pawn, Thing food)
@@ -106,32 +108,6 @@ namespace FoodTracker
             }
 
             nutritionTracker.SetRemainingNutrition(nutrition);
-        }
-
-        // This calls a method in CompPartialNutrition to consume a specified amount of nutrition from a food Thing.
-        // It returns the actual amount of nutrition consumed, which may be less than requested if the food does not have enough remaining nutrition.
-        // If the food is null, destroyed, or does not have a CompPartialNutrition component, it returns 0.
-        public static float ConsumeNutritionFromFood(Thing food, float nutritionToConsume)
-        {
-            if (food == null || food.Destroyed)
-            {
-                Log.Warning($"[FoodTracker] Input is not valid. Food: {food?.def?.defName ?? "NULL"}, Food ID: " +
-                    $"{food?.thingIDNumber ?? 0}, Food Destroyed: {food?.Destroyed ?? false}");
-
-                return 0f;
-
-            }
-
-            CompPartialNutrition nutritionTracker = food.TryGetComp<CompPartialNutrition>();
-
-            if (nutritionTracker == null)
-            {
-                Log.Warning($"[FoodTracker] Component missing from {food?.def?.defName ?? "NULL"}. Food ID: {food.thingIDNumber}");
-
-                return 0f;
-            }
-
-            return nutritionTracker.ConsumeNutrition(nutritionToConsume);
         }
 
         // Method to check pawn and nutrition for invalid values, and apply nutrition to pawn.

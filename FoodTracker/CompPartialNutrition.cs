@@ -10,22 +10,12 @@ namespace FoodTracker
         // If remainingNutrition is negative, it indicates that the value has not been initialized yet.
         private float remainingNutrition = -1f;
 
-        //
+        // Due to the patch on StatWorker.GetValue(), you can no longer use .GetStatValue(StatDefOf.Nutrition) to get base nutrition
         private float GetBaseNutrition()
         {
             StatModifier nutritionStat = parent.def.statBases?.FirstOrDefault(x => x.stat == StatDefOf.Nutrition);
 
             return nutritionStat?.value ?? 0f;
-        }
-
-        // This method consumes a specified amount of nutrition from the food item, ensuring that it does not exceed the remaining nutrition. It returns the actual amount of nutrition consumed.
-        public float ConsumeNutrition(float nutritionToConsume)
-        {
-            float nutritionRemoved = Mathf.Clamp(nutritionToConsume, 0f, RemainingNutrition);
-
-            remainingNutrition -= nutritionRemoved;
-
-            return nutritionRemoved;
         }
 
         // Set the remaining nutrition of the food item, ensuring it doesn't go below zero.
