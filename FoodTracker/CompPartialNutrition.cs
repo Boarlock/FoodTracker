@@ -13,10 +13,7 @@ namespace FoodTracker
         // This method consumes a specified amount of nutrition from the food item, ensuring that it does not exceed the remaining nutrition. It returns the actual amount of nutrition consumed.
         public float ConsumeNutrition(float nutritionToConsume)
         {
-            float nutritionRemoved = Mathf.Clamp(
-                nutritionToConsume,
-                0f,
-                RemainingNutrition);
+            float nutritionRemoved = Mathf.Clamp(nutritionToConsume, 0f, RemainingNutrition);
 
             remainingNutrition -= nutritionRemoved;
 
@@ -45,16 +42,12 @@ namespace FoodTracker
         // Expose the remaining nutrition value for saving and loading. This ensures that the state of the food item is preserved across game sessions.
         public override void PostExposeData()
         {
-            Scribe_Values.Look(
-                ref remainingNutrition,
-                "remainingNutrition",
-                -1f);
+            Scribe_Values.Look(ref remainingNutrition, "remainingNutrition", -1f);
         }
     }
 
     public class CompProperties_PartialNutrition : CompProperties
     {
-
         public CompProperties_PartialNutrition()
         {
             compClass = typeof(CompPartialNutrition);

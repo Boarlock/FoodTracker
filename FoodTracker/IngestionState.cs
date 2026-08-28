@@ -3,18 +3,24 @@ using Verse;
 
 namespace FoodTracker
 {
+
+    // Snapshot of ingestion job 
     public class IngestionState
     {
-        public Pawn Pawn;
+        // Captured during Prefix while the Food Thing is still reliable.
         public Thing Food;
-        public int TotalTicks;
+        public ThingDef MealDef;
         public float NutritionAtStart;
         public float NutritionPerItem;
-        public float HungerAtStart;
         public int IngestCount;
-        public int StartingStackCount;
+
+        // Captured after vanilla initializes the toil.
+        public Pawn Pawn;
+        public int TotalTicks;
+        public float HungerAtStart;
         public IntVec3 FoodCell;
-        public ThingDef MealDef;
+
+        // Runtime state.
         public float EatenFraction;
         public bool Finalized;
     }

@@ -7,7 +7,6 @@ namespace FoodTracker
 {
     public class FoodTrackerMod : Mod
     {
-        public static FoodTrackerSettings settings;
 
         public FoodTrackerMod(ModContentPack content) : base(content)
         {
@@ -15,18 +14,17 @@ namespace FoodTracker
             settings = GetSettings<FoodTrackerSettings>();
 
             // 2. Initialize Harmony
-            var harmony = new Harmony("b0arl0ck.FoodTracker");
+            var harmony = new Harmony("b0arl0ck.foodtracker");
             harmony.PatchAll();
 
             // 3. Log Initialization
-            if (FoodTrackerSettings.Verbose)
-            {
-                Log.Message($"[FoodTracker] Initialization completed.");
-            }
+            Log.Message($"[FoodTracker] Initialization completed.");
 
         }
 
-        public override string SettingsCategory() => "Food Tracker - Partial Meals";
+        public static FoodTrackerSettings settings;
+
+        public override string SettingsCategory() => "Food Tracker";
 
         public override void DoSettingsWindowContents(Rect inRect)
         {

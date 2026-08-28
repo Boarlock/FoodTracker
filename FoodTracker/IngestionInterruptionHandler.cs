@@ -7,12 +7,10 @@ namespace FoodTracker
     {
         public static void Handle(IngestionState state)
         {
-            if (state == null)
-                return;
 
-            if (state.Pawn == null || state.Food == null)
+            if (state == null || state.Pawn == null || state.Food == null || state.MealDef == null)
             {
-                Log.Warning("[FoodTracker] Interruption state or food reference is null.");
+                Log.Warning("[FoodTracker] Interruption state, food, meal def or pawn reference is null.");
                 return;
             }
 
@@ -21,13 +19,11 @@ namespace FoodTracker
             {
                 if (FoodTrackerSettings.Verbose)
                 {
-
-                    Log.Message($"[FoodTracker] {state.Food.def?.defName ?? "NULL"} has been destroyed. Attempting to recover.");
-
+                    Log.Message($"[FoodTracker] {state.MealDef.defName ?? "NULL"} has been destroyed. Attempting to recover.");
                 }
 
                 // Checking to see if it has a corresponding meal def.
-                if (FoodTrackingHelpers.GetMealDef(state.Food.def) != null)
+                if (FoodTrackingHelpers.GetMealDef(state.MealDef) != null)
                 {
                     DestroyedFoodRecovery.HandleDestroyedMeal(state);
 
@@ -61,8 +57,8 @@ namespace FoodTracker
                 if (FoodTrackerSettings.Verbose)
                 {
                     Log.Message($"[FoodTracker] Batch food interrupted. Nutrition Eaten: {nutritionOnStackEaten:F2}, " +
-                        $"Old Stack Count: {state.StartingStackCount}, New Stack Count: {state.Food.stackCount}, " +
-                        $"Items Eaten: {itemsEaten}, Food: {state.Food.Label}, Food ID: {state.Food.thingIDNumber}, Food Def: {state.Food.def.defName}");
+                        $"New Stack Count: {state.Food.stackCount}, " +
+                        $"Items Eaten: {itemsEaten}, Food: {state.MealDef.defName}, Food ID: {state.Food.thingIDNumber}");
                 }
 
                 // Do NOT fall through to meal component consumption, as the stackable food has already been handled.
@@ -73,39 +69,38 @@ namespace FoodTracker
             float nutritionToConsume = state.NutritionAtStart * state.EatenFraction;
 
             // Calculate the actual nutrition removed from the food item, which is clamped to prevent exceeding the remaining nutrition.
-            float nutritionRemoved = FoodTrackingHelpers.ConsumeNutrition(state.Food, nutritionToConsume);
+            float nutritionRemoved = FoodTrackingHelpers.ConsumeNutritionFromFood(state.Food, nutritionToConsume);
 
             // Give the pawn and its records exactly the amount removed from the food.
             FoodTrackingHelpers.ApplyNutritionToPawn(state.Pawn, nutritionRemoved);
 
-            // Get the remaining nutrition after consumption to determine if the food should be destroyed or replaced with a partial meal.
+            // Get the remaining nutrition after consumption to create a partial meal or only output to log.
             float remainingNutrition = FoodTrackingHelpers.GetRemainingNutrition(state.Food);
 
             if (FoodTrackerSettings.Verbose)
             {
                 Log.Message($"[FoodTracker] Meal food interrupted. Nutrition Eaten: {nutritionRemoved:F2}, NutritionRemaining: {remainingNutrition:F2}, " +
-                    $"Food: {state.Food.Label}, Food ID: {state.Food.thingIDNumber}, Food Def: {state.Food.def.defName}");
+                    $"Food: {state.MealDef.defName}, Food ID: {state.Food.thingIDNumber}");
             }
 
+            // Check if we just processed a partial meal or a vanilla meal, i.e. if its being tracked already
             if (FoodTrackingHelpers.IsTracked(state.Food))
             {
                 if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker] {state.Food} is already tracked, exiting interruption.");
+                    Log.Message($"[FoodTracker] {state.MealDef.defName} is already tracked, exiting interruption.");
 
                 return;
             }
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker] Replacing {state.Food.def.defName} with {(FoodTrackingHelpers.GetMealDef(state.MealDef))?.defName ?? "NULL"}, Food ID: {state.Food.thingIDNumber}");
-
+                Log.Message($"[FoodTracker] Replacing {state.MealDef.defName}, Food ID: {state.Food.thingIDNumber} with {(FoodTrackingHelpers.GetMealDef(state.MealDef))?.defName ?? "NULL"}");
 
             // Create a new Thing to represent the new meal, and drop it in the world.
-            Thing newFood =
-                PartialMealFactory.ReplaceAndDropPartialMeal(state, remainingNutrition);
+            Thing newFood = PartialMealFactory.ReplaceAndDropPartialMeal(state, remainingNutrition);
 
             if (newFood == null)
             {
-                Log.Warning($"[FoodTracker] Failed to make partial {newFood?.Label ?? "NULL"} near {state.Pawn.Label}. Food ID: {newFood?.thingIDNumber ?? 0}, Food Def: {state.Food?.def.defName ?? "NULL"}.");
+                Log.Warning($"[FoodTracker] Failed to make partial {newFood?.def.defName ?? "NULL"} near {state.Pawn.Label}. Food ID: {newFood?.thingIDNumber ?? 0}");
             }
 
         }
