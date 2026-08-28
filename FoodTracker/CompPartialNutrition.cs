@@ -10,6 +10,14 @@ namespace FoodTracker
         // If remainingNutrition is negative, it indicates that the value has not been initialized yet.
         private float remainingNutrition = -1f;
 
+        //
+        private float GetBaseNutrition()
+        {
+            StatModifier nutritionStat = parent.def.statBases?.FirstOrDefault(x => x.stat == StatDefOf.Nutrition);
+
+            return nutritionStat?.value ?? 0f;
+        }
+
         // This method consumes a specified amount of nutrition from the food item, ensuring that it does not exceed the remaining nutrition. It returns the actual amount of nutrition consumed.
         public float ConsumeNutrition(float nutritionToConsume)
         {
@@ -31,9 +39,8 @@ namespace FoodTracker
         {
             get
             {
-                // If remainingNutrition is negative, it means it hasn't been set yet, so we initialize it with the full nutrition value of the parent Thing.
                 if (remainingNutrition < 0f)
-                    remainingNutrition = parent.GetStatValue(StatDefOf.Nutrition);
+                    remainingNutrition = GetBaseNutrition();
 
                 return remainingNutrition;
             }

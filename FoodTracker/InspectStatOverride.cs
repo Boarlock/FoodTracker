@@ -4,8 +4,7 @@ using RimWorld;
 
 namespace FoodTracker
 {
-    [HarmonyPatch(typeof(StatWorker), nameof(StatWorker.GetValue), new[] { typeof(Thing), typeof(bool), typeof(int) }
-)]
+    [HarmonyPatch(typeof(StatWorker), nameof(StatWorker.GetValue), new[] { typeof(Thing), typeof(bool), typeof(int) })]
     public static class NutritionStatPatch
     {
         static bool Prefix(StatWorker __instance, Thing thing, ref float __result, StatDef ___stat)
@@ -16,7 +15,7 @@ namespace FoodTracker
             if (thing == null || thing.Destroyed)
                 return true;
 
-            if (!FoodTrackingHelpers.IsTracked(thing))
+            if (thing.def.defName.StartsWith("FoodTracker_") == false)
                 return true;
 
             CompPartialNutrition comp = thing.TryGetComp<CompPartialNutrition>();

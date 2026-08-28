@@ -17,7 +17,7 @@ namespace FoodTracker
             }
 
             // Get the partial meal definition corresponding to the vanilla meal. If no partial meal definition is found, return null.
-            ThingDef partialDef = FoodTrackingHelpers.GetMealDef(state.MealDef);
+            ThingDef partialDef = DynamicMealDefFactory.CreateTrackerMeal(state.MealDef);
 
             if (partialDef == null)
             {
@@ -35,7 +35,7 @@ namespace FoodTracker
             }
 
             // If created item doesn't for any reason contain our component then delete it.
-            if (!FoodTrackingHelpers.IsTracked(food))
+            if (food.def.defName.StartsWith("FoodTracker_"))
             {
                 Log.Warning($"[FoodTracker] Component missing from {food.def.defName}. Food ID: {food.thingIDNumber}");
 
@@ -84,7 +84,7 @@ namespace FoodTracker
 
             if (FoodTrackerSettings.Verbose)
             {
-                Log.Message($"[FoodTracker] {state.MealDef.defName}, {state.Food.thingIDNumber} has been replaced by {resultingThing?.def.defName ?? "NULL"}. Is Tracked: {FoodTrackingHelpers.IsTracked(resultingThing)}");
+                Log.Message($"[FoodTracker] {state.MealDef.defName}, {state.Food.thingIDNumber} has been replaced by {resultingThing?.def.defName ?? "NULL"}. Is Tracked: {resultingThing?.def.defName.StartsWith("FoodTracker_")}");
             }
 
             // Return the newly created partial meal.
@@ -104,7 +104,7 @@ namespace FoodTracker
             }
 
             // Get the partial meal definition corresponding to the original vanilla meal definition.
-            ThingDef partialDef = FoodTrackingHelpers.GetMealDef(state.MealDef);
+            ThingDef partialDef = DynamicMealDefFactory.CreateTrackerMeal(state.MealDef);
 
             if (partialDef == null)
             {
@@ -123,7 +123,7 @@ namespace FoodTracker
             }
 
             // Verify the component exists before attempting to use it.
-            if (!FoodTrackingHelpers.IsTracked(food))
+            if (food.def.defName.StartsWith("FoodTracker_") == false)
             {
 
                 Log.Warning($"[FoodTracker] Component missing from {food.def.defName}. Food ID: {food.thingIDNumber}");
@@ -165,7 +165,7 @@ namespace FoodTracker
             if (FoodTrackerSettings.Verbose)
             {
                 Log.Message($"[FoodTracker] New partial {resultingThing?.def.defName ?? "NULL"} created successfully. Food ID: {resultingThing?.thingIDNumber ?? 0}, " +
-                    $"Remaining Nutrition: {FoodTrackingHelpers.GetRemainingNutrition(resultingThing):F2}, Is Tracked: {FoodTrackingHelpers.IsTracked(resultingThing)}");
+                    $"Remaining Nutrition: {FoodTrackingHelpers.GetRemainingNutrition(resultingThing):F2}, Is Tracked: {resultingThing?.def.defName.StartsWith("FoodTracker_")}");
             }
 
             return resultingThing;

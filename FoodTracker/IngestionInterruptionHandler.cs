@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using RimWorld;
+using UnityEngine;
 using Verse;
 
 namespace FoodTracker
@@ -22,8 +23,8 @@ namespace FoodTracker
                     Log.Message($"[FoodTracker] {state.MealDef.defName ?? "NULL"} has been destroyed. Attempting to recover.");
                 }
 
-                // Checking to see if it has a corresponding meal def.
-                if (FoodTrackingHelpers.GetMealDef(state.MealDef) != null)
+                // Checking to see if its a tracked meal.
+                if (state.MealDef.defName.StartsWith("FoodTracker_"))
                 {
                     DestroyedFoodRecovery.HandleDestroyedMeal(state);
 
@@ -84,7 +85,7 @@ namespace FoodTracker
             }
 
             // Check if we just processed a partial meal or a vanilla meal, i.e. if its being tracked already
-            if (FoodTrackingHelpers.IsTracked(state.Food))
+            if (state.MealDef.defName.StartsWith("FoodTracker_"))
             {
                 if (FoodTrackerSettings.Verbose)
                     Log.Message($"[FoodTracker] {state.MealDef.defName} is already tracked, exiting interruption.");
@@ -92,8 +93,10 @@ namespace FoodTracker
                 return;
             }
 
+            ThingDef trackerDef = DynamicMealDefFactory.CreateTrackerMeal(state.MealDef);
+
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker] Replacing {state.MealDef.defName}, Food ID: {state.Food.thingIDNumber} with {(FoodTrackingHelpers.GetMealDef(state.MealDef))?.defName ?? "NULL"}");
+                Log.Message($"[FoodTracker] Replacing {state.MealDef.defName}, Food ID: {state.Food.thingIDNumber} with {trackerDef?.defName ?? "NULL"}");
 
             // Create a new Thing to represent the new meal, and drop it in the world.
             Thing newFood = PartialMealFactory.ReplaceAndDropPartialMeal(state, remainingNutrition);

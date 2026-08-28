@@ -58,9 +58,12 @@ namespace FoodTracker
                 return;
             }
 
+            ThingDef generatedDef = DynamicMealDefFactory.CreateTrackerMeal(food.def);
+
             // Eating time scales with the nutrition remaining.
-            if (FoodTrackingHelpers.IsTracked(food))
+            if (food.def.defName.StartsWith("FoodTracker_"))
             {
+
                 float remainingFraction = Mathf.Clamp01(FoodTrackingHelpers.GetRemainingNutrition(food) / __state.NutritionPerItem);
 
                 durationMultiplier *= remainingFraction;
@@ -189,7 +192,7 @@ namespace FoodTracker
     {
         public static void Handle(IngestionState state)
         {
-            if (!FoodTrackingHelpers.IsTracked(state?.Food) || FoodTrackingHelpers.GetMealDef(state.MealDef) == null)
+            if (state.MealDef.defName.StartsWith("FoodTracker_") == false)
             {
                 if (FoodTrackerSettings.Verbose)
                     Log.Message($"[FoodTracker] {state?.MealDef.defName ?? "NULL"} is not a tracked partial meal or, has no " +
