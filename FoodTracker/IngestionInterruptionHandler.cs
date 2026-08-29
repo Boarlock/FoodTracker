@@ -83,7 +83,7 @@ namespace FoodTracker
             // Then determine how much of a partial meal is leftover and how much nutrition is leftover.
             float partialMealEatenFraction = itemsEatenExact - wholeItemsEaten;
             float partialMealRemainingFraction = 1f - partialMealEatenFraction;
-            float partialMealNutrition = partialMealRemainingFraction * state.NutritionPerItem;
+            float partialMealNutrition = partialMealRemainingFraction * state.NutritionAtStart;
 
             // Give the pawn and its records exactly the amount removed from the food.
             FoodTrackingHelpers.ApplyNutritionToPawn(state.Pawn, nutritionEaten);

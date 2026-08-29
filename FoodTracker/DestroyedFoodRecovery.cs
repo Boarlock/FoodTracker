@@ -62,7 +62,7 @@ namespace FoodTracker
             int itemsToRemove = Mathf.Min(Mathf.CeilToInt(itemsEatenExact), survivingStack.stackCount);
 
             // Only remove items up to stackCount, if it would leave stackCount at 0 then simply delte the object
-            if (itemsToRemove >= state.Food.stackCount)
+            if (itemsToRemove >= survivingStack.stackCount)
                 survivingStack.Destroy(DestroyMode.Vanish);
             else
                 survivingStack.stackCount -= itemsToRemove;
@@ -70,7 +70,7 @@ namespace FoodTracker
             // Calculate remaining nutrition to not go below zero.
             float partialMealEatenFraction = itemsEatenExact - wholeItemsEaten;
             float partialMealRemainingFraction = 1f - partialMealEatenFraction;
-            float partialMealNutrition = partialMealRemainingFraction * state.NutritionPerItem;
+            float partialMealNutrition = partialMealRemainingFraction * state.NutritionAtStart;
 
             // Create the partial meal and drop at specified cell
             Thing partialMeal = PartialMealFactory.CreateAndDropPartialMeal(state, partialMealNutrition);

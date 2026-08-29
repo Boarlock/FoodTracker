@@ -75,7 +75,7 @@ namespace FoodTracker
                 durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
 
                 if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker] Non-Tracked meal detected. Not scaling eating duration.");
+                    Log.Message($"[FoodTracker] Non-Tracked meal detected. Scaling eating duration to {durationMultiplier:P0}");
 
                 return;
             }
