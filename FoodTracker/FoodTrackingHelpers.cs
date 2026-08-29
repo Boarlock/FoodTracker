@@ -6,10 +6,16 @@ namespace FoodTracker
 {
     public static class FoodTrackingHelpers
     {
-        // If nutrition is below this threshold treat as interrupted, otherwise FoodTracker does not interfere with ingestion completion
-        public const float MealCompletionThreshold = 0.995f;
+        // If nutrition is below this threshold treat as interrupted, otherwise FoodTracker does not interfere with ingestion completion.
+        public const float MealCompletionThreshold = 0.99f;
 
-        // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def
+        // This is a number we use internally to classify if something is treated as a meal or a batch food item (to make a partial variant or not to).
+        public const float MealQualifierThreshold = 0.225f;
+
+        // This is a number we use to scale eating duration time.
+        public const float NutritionConsumptionRateMultiplier = 0.90f;
+
+        // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
         public static ThingDef GetOriginalMealDef(ThingDef foodDef)
         {
             if (foodDef == null)
@@ -18,7 +24,7 @@ namespace FoodTracker
             if (!foodDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
                 return foodDef;
 
-            string originalDefName = foodDef.defName.Substring(DynamicMealDefFactory.Prefix.Length);
+            string originalDefName = foodDef.defName[DynamicMealDefFactory.Prefix.Length..];
 
             return DefDatabase<ThingDef>.GetNamedSilentFail(originalDefName);
         }
@@ -26,10 +32,13 @@ namespace FoodTracker
         // Determines if the target food is a batch food item that can be consumed in multiple portions.
         public static bool IsBatchFood(ThingDef foodDef)
         {
-            if (foodDef == null || foodDef.ingestible == null)
+            if (foodDef == null)
                 return false;
 
-            return foodDef.ingestible.maxNumToIngestAtOnce != 1;
+            ThingDef originalDef = GetOriginalMealDef(foodDef);
+            float nutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
+
+            return nutrition < MealQualifierThreshold;
         }
 
         public static bool ValidateFoodEatingAttempt(Pawn pawn, Thing food)

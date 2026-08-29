@@ -15,15 +15,15 @@ namespace FoodTracker
         public static void Prefix(Pawn chewer, ref float durationMultiplier, TargetIndex ingestibleInd, ref IngestionState __state)
         {
 
-            // Get current job and target food
+            // Get current job and target food.
             Job curJob = chewer.CurJob;
             Thing food = curJob?.GetTarget(ingestibleInd).Thing;
 
-            // Validate pawn is human and not null and food is nutrition giving and not null
+            // Validate pawn is human and not null and food is nutrition giving and not null.
             if (!FoodTrackingHelpers.ValidateFoodEatingAttempt(chewer, food))
                 return;
 
-            // Get count of items to be consumed and calculate base nutrition per item
+            // Get count of items to be consumed and calculate base nutrition per item.
             ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(food.def);
             float nutritionPerItem = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
             int ingestCount = curJob?.count ?? 0;
@@ -36,25 +36,22 @@ namespace FoodTracker
                 return;
             }
 
-            // Batch foods don't carry a component, this scales eating duration off total nutrition eaten
+            // Batch foods don't carry a component, this scales eating duration off total nutrition eaten.
             if (FoodTrackingHelpers.IsBatchFood(food.def))
             {
                 __state = new IngestionState
                 {
                     MealDef = originalDef,
                     NutritionPerItem = nutritionPerItem,
+                    TotalNutrition = ingestCount * nutritionPerItem,
                     StartingStackCount = food.stackCount,
                     IngestCount = ingestCount
                 };
 
-                float totalNutrition = __state.NutritionPerItem * __state.IngestCount;
-
-                durationMultiplier *= Mathf.Max(0.01f, totalNutrition / 0.9f);
+                durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
 
                 if (FoodTrackerSettings.Verbose)
-                {
                     Log.Message($"[FoodTracker] Batch food detected. Scaling eating duration to {durationMultiplier:P0}");
-                }
 
                 return;
             }
@@ -68,49 +65,50 @@ namespace FoodTracker
                 {
                     MealDef = originalDef,
                     TrackerDef = trackerDef,
-                    NutritionAtStart = nutritionPerItem,
                     NutritionPerItem = nutritionPerItem,
+                    NutritionAtStart = nutritionPerItem,
+                    TotalNutrition = ingestCount * nutritionPerItem,
                     IngestCount = ingestCount
                 };
 
+                // Calculate eating duration off total nutrition being consumed.
+                durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
+
                 if (FoodTrackerSettings.Verbose)
-                {
                     Log.Message($"[FoodTracker] Non-Tracked meal detected. Not scaling eating duration.");
-                }
 
                 return;
             }
 
-            // Otherwise it is a tracked meal and we need to calclate remaining nutrition and eating duration
+            float nutritionAtStart = FoodTrackingHelpers.GetRemainingNutrition(food);
+
+            // Otherwise it is a tracked meal and we need to calclate remaining nutrition and eating duration.
             __state = new IngestionState
             {
+                // FoodTracker meals can't stack so total nutrition will always be NutritionAtStart.
                 MealDef = food.def,
                 TrackerDef = trackerDef,
-                NutritionAtStart = FoodTrackingHelpers.GetRemainingNutrition(food),
                 NutritionPerItem = nutritionPerItem,
+                NutritionAtStart = nutritionAtStart,
+                TotalNutrition = nutritionAtStart,
                 IngestCount = ingestCount
             };
 
-            // Caclulate eating duration based off nutrition at start 
-
-            float remainingFraction = Mathf.Clamp01(FoodTrackingHelpers.GetRemainingNutrition(food) / __state.NutritionPerItem);
-
-            durationMultiplier *= remainingFraction;
+            // Caclulate eating duration based off nutrition at start.
+            durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / FoodTrackingHelpers.NutritionConsumptionRateMultiplier);
 
             if (FoodTrackerSettings.Verbose)
-            {
                 Log.Message($"[FoodTracker] Tracked meal detected. Scaling eating duration to {durationMultiplier:P0}");
-            }
 
         }
 
-        public static void Postfix(Toil __result, Pawn chewer, float durationMultiplier, TargetIndex ingestibleInd, IngestionState __state)
+        public static void Postfix(Toil __result, Pawn chewer, TargetIndex ingestibleInd, IngestionState __state)
         {
             // If Prefix didn't produce a state, FoodTracker has nothing to track.
             if (__state == null)
                 return;
 
-            // Assigning __state to local state variable and assigning the toil to local variable
+            // Assigning __state to local state variable and assigning the toil to local variable.
             IngestionState state = __state;
             Toil toil = __result;
 
@@ -140,12 +138,12 @@ namespace FoodTracker
                 // First: let vanilla initialize the toil exactly as normal.
                 originalInit?.Invoke();
 
-                // Capture ticks immediately after Toil Init then capture food and job
+                // Capture ticks immediately after Toil Init then capture food and job.
                 int totalTicks = Mathf.Max(1, chewer.jobs.curDriver.ticksLeftThisToil);
                 Job curJob = chewer.CurJob;
                 Thing food = chewer.CurJob?.GetTarget(ingestibleInd).Thing;
 
-                // Finish populating the state
+                // Finish populating the state.
                 state.Food = food;
                 state.Pawn = chewer;
                 state.HungerAtStart = chewer.needs.food.CurLevel;
@@ -175,7 +173,7 @@ namespace FoodTracker
                 }
 
                 // ChewIngestible ended without FinalizeIngest. Before treating this as an interruption.  Check if fraction of food eaten, 
-                //  exceeds 99.5%. This protects vanilla's Thing lifecycle from our replacement logic when the two systems are out of sync.
+                // exceeds 99%. This protects vanilla's Thing lifecycle from our replacement logic when the two systems are out of sync.
 
                 if (state.EatenFraction >= FoodTrackingHelpers.MealCompletionThreshold)
                 {
@@ -196,7 +194,7 @@ namespace FoodTracker
     [HarmonyPatch(typeof(Toils_Ingest), nameof(Toils_Ingest.FinalizeIngest))]
     public static class FinalizeIngestPatch
     {
-        public static void Postfix(Pawn ingester, TargetIndex ingestibleInd)
+        public static void Postfix(Pawn ingester)
         {
             if (!FoodTrackerIngestionTracker.TryGet(ingester, out IngestionState state))
                 return;
@@ -206,7 +204,7 @@ namespace FoodTracker
         }
     }
 
-    // Final completion handler to apply any corrections to nutrition after a meal is finished
+    // Final completion handler to apply any corrections to nutrition after a meal is finished.
     public static class IngestionCompletionHandler
     {
         public static void Handle(IngestionState state)

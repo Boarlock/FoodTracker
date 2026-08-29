@@ -17,10 +17,8 @@ namespace FoodTracker
             }
 
             // Calculate the actual nutrition eaten based off eating time and nutrition in food at the start, clamped at 0 and nutrition max.
-            float nutritionEaten = Mathf.Clamp(state.NutritionAtStart * state.EatenFraction, 0f, state.NutritionAtStart);
-
-            // Calculate remaining nutrition to not go below zero.
-            float remainingNutrition = Mathf.Max(0f, state.NutritionAtStart - nutritionEaten);
+            float nutritionEaten = state.TotalNutrition * state.EatenFraction;
+            float itemsEatenExact = nutritionEaten / state.NutritionPerItem;
 
             // Get map of pawn which is where destroyedFood resided before destruction
             Map map = state.Pawn.Map;
@@ -52,8 +50,6 @@ namespace FoodTracker
                 break;
             }
 
-            ThingDef mealDef = state.MealDef ?? survivingStack?.def;
-
             // If surviving stack cannot be found 
             if (survivingStack == null)
             {
@@ -62,14 +58,22 @@ namespace FoodTracker
                 return;
             }
 
-            // Only remove item from stack if greater than 1, otherwise destroy leftover meal
-            if (survivingStack.stackCount > 1)
-                survivingStack.stackCount--;
-            else
+            int wholeItemsEaten = Mathf.FloorToInt(itemsEatenExact);
+            int itemsToRemove = Mathf.Min(Mathf.CeilToInt(itemsEatenExact), survivingStack.stackCount);
+
+            // Only remove items up to stackCount, if it would leave stackCount at 0 then simply delte the object
+            if (itemsToRemove >= state.Food.stackCount)
                 survivingStack.Destroy(DestroyMode.Vanish);
+            else
+                survivingStack.stackCount -= itemsToRemove;
+
+            // Calculate remaining nutrition to not go below zero.
+            float partialMealEatenFraction = itemsEatenExact - wholeItemsEaten;
+            float partialMealRemainingFraction = 1f - partialMealEatenFraction;
+            float partialMealNutrition = partialMealRemainingFraction * state.NutritionPerItem;
 
             // Create the partial meal and drop at specified cell
-            Thing partialMeal = PartialMealFactory.CreateAndDropPartialMeal(state, remainingNutrition);
+            Thing partialMeal = PartialMealFactory.CreateAndDropPartialMeal(state, partialMealNutrition);
 
             if (partialMeal == null)
             {
@@ -93,15 +97,13 @@ namespace FoodTracker
             }
 
             // Calculate the number of items eaten and nutrition eaten
-            int itemsEaten = Mathf.Clamp(Mathf.FloorToInt(state.EatenFraction * state.IngestCount), 0, state.IngestCount);
-            float nutritionOnStackEaten = itemsEaten * state.NutritionPerItem;
+            float nutritionEaten = state.TotalNutrition * state.EatenFraction;
+            int wholeItemsEaten = Mathf.FloorToInt(nutritionEaten / state.NutritionPerItem);
 
 
-            // Vanilla restored the food to the stack and no whole batch items were consumed. No correction to the surviving stack is necessary.
-            if (itemsEaten <= 0)
-            {
+            // Vanilla restored the food to the stack and no whole batch items were consumed.
+            if (wholeItemsEaten <= 0)
                 return;
-            }
 
             // Get map of pawn which is where destroyedFood resided before destruction
             Map map = state.Pawn.Map;
@@ -142,21 +144,20 @@ namespace FoodTracker
             }
 
             // Only remove items from stack up to max stack size otherwise destroy the Thing
-            int itemsToRemove = Mathf.Min(itemsEaten, survivingStack.stackCount);
+            int itemsToRemove = Mathf.Min(wholeItemsEaten, survivingStack.stackCount);
+            float nutritionOnStackEaten = itemsToRemove * state.NutritionPerItem;
+
+            // Give the pawn and its records exactly the amount removed from the food.
+            FoodTrackingHelpers.ApplyNutritionToPawn(state.Pawn, nutritionOnStackEaten);
 
             if (itemsToRemove >= survivingStack.stackCount)
                 survivingStack.Destroy(DestroyMode.Vanish);
             else
                 survivingStack.stackCount -= itemsToRemove;
 
-            // Give the pawn and its records exactly the amount removed from the food.
-            FoodTrackingHelpers.ApplyNutritionToPawn(state.Pawn, nutritionOnStackEaten);
-
             if (FoodTrackerSettings.Verbose)
-            {
                 Log.Message($"[FoodTracker] Consumption complete for {state.MealDef.defName}, Food ID: {state.Food.thingIDNumber}. " +
-                        $"Starting Stack: {state.StartingStackCount}, Items Eaten: {itemsEaten}, Ending Stack: {survivingStack.stackCount}, Nutrition Eaten: {nutritionOnStackEaten:F2}");
-            }
+                        $"Items Eaten: {itemsToRemove}, Nutrition Eaten: {nutritionOnStackEaten:F2}");
         }
     }
 }

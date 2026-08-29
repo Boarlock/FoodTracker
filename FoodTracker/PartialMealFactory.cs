@@ -5,7 +5,7 @@ namespace FoodTracker
     public static class PartialMealFactory
     {
         // Replace a vanilla meal with its corresponding partial meal definition, dropping the new item.
-        public static Thing ReplaceAndDropPartialMeal(IngestionState state, float remainingNutrition)
+        public static Thing ReplaceAndDropPartialMeal(IngestionState state, float remainingNutrition, int itemsToRemove)
         {
             // Validate the input parameters.
             if (state == null || state.Pawn == null || state.Food == null || state.Food.Destroyed)
@@ -30,9 +30,7 @@ namespace FoodTracker
             Thing food = ThingMaker.MakeThing(partialDef);
 
             if (FoodTrackerSettings.Verbose)
-            {
                 Log.Message($"[FoodTracker] New partial {food.def.defName}, Food ID: {food.thingIDNumber} Thing created.");
-            }
 
             // If created item doesn't for any reason contain our component then delete it.
             if (food.TryGetComp<CompPartialNutrition>() == null)
@@ -77,19 +75,16 @@ namespace FoodTracker
                 return null;
             }
 
-            // Destroy the vanilla meal only if stack count is 1
-            if (state.Food.stackCount > 1)
-                state.Food.stackCount--;
-            else
+            // Only remove items up to stackCount, if it would leave stackCount at 0 then simply delte the object
+            if (itemsToRemove >= state.Food.stackCount)
                 state.Food.Destroy(DestroyMode.Vanish);
+            else
+                state.Food.stackCount -= itemsToRemove;
 
             if (FoodTrackerSettings.Verbose)
-            {
                 Log.Message($"[FoodTracker] {state.MealDef.defName}, {state.Food.thingIDNumber} has been replaced by {resultingThing?.def?.defName ?? "NULL"}, " +
                     $"{resultingThing?.thingIDNumber ?? 0}. Is Tracked: {!(resultingThing?.TryGetComp<CompPartialNutrition>() == null)}");
-            }
 
-            // Return the newly created partial meal.
             return resultingThing;
         }
 
@@ -120,9 +115,7 @@ namespace FoodTracker
             Thing food = ThingMaker.MakeThing(partialDef);
 
             if (FoodTrackerSettings.Verbose)
-            {
                 Log.Message($"[FoodTracker] New partial {food.def.defName}, {food.thingIDNumber} Thing created.");
-            }
 
             // Verify the component exists before attempting to use it.
             if (food.TryGetComp<CompPartialNutrition>() == null)
@@ -144,10 +137,8 @@ namespace FoodTracker
             FoodTrackingHelpers.SetRemainingNutrition(food, remainingNutrition);
 
             if (FoodTrackerSettings.Verbose)
-            {
                 Log.Message($"[FoodTracker] Preparing to drop partial {food.def.defName}, {food.thingIDNumber}. " +
                     $"Remaining Nutrition: {remainingNutrition:F2}, Intended Drop Cell: {state.FoodCell}");
-            }
 
             // Drop the new partial meal into the world.
             if (!GenDrop.TryDropSpawn(food, state.FoodCell, state.Pawn.Map, ThingPlaceMode.Near, out Thing resultingThing))
@@ -165,10 +156,8 @@ namespace FoodTracker
             }
 
             if (FoodTrackerSettings.Verbose)
-            {
                 Log.Message($"[FoodTracker] {state?.MealDef?.defName ?? "NULL"}, {state?.Food?.thingIDNumber ?? 0} has been replaced by {resultingThing?.def?.defName ?? "NULL"}, " +
                     $"{resultingThing?.thingIDNumber ?? 0}. Is Tracked: {!(resultingThing?.TryGetComp<CompPartialNutrition>() == null)}");
-            }
 
             return resultingThing;
         }

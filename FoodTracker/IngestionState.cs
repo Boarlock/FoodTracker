@@ -13,6 +13,7 @@ namespace FoodTracker
         public ThingDef TrackerDef;
         public float NutritionAtStart;
         public float NutritionPerItem;
+        public float TotalNutrition;
         public int StartingStackCount;
         public int IngestCount;
 
