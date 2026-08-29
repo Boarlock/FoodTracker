@@ -19,7 +19,11 @@ namespace FoodTracker
         public static ThingDef GetOriginalMealDef(ThingDef foodDef)
         {
             if (foodDef == null)
+            {
+                Log.Warning($"[FoodTracker] Input is not valid. ThingDef Null: {foodDef == null}");
+
                 return null;
+            }
 
             if (!foodDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
                 return foodDef;
@@ -29,11 +33,15 @@ namespace FoodTracker
             return DefDatabase<ThingDef>.GetNamedSilentFail(originalDefName);
         }
 
-        // Determines if the target food is a batch food item that can be consumed in multiple portions.
+        // Determines if the target food is a batch food item that should not be subdivided into partials.
         public static bool IsBatchFood(ThingDef foodDef)
         {
             if (foodDef == null)
+            {
+                Log.Warning($"[FoodTracker] Input is not valid. ThingDef Null: {foodDef == null}");
+
                 return false;
+            }
 
             ThingDef originalDef = GetOriginalMealDef(foodDef);
             float nutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
@@ -47,39 +55,28 @@ namespace FoodTracker
             if (pawn == null || food == null || food.Destroyed)
             {
                 if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker] Inputs are not valid. Pawn: {pawn?.Label ?? "NULL"}, Food: {food?.def?.defName ?? "NULL"}, " +
-                        $"Food ID: {food?.thingIDNumber ?? 0}, Food Destroyed: {food?.Destroyed ?? false}");
+                    Log.Message($"[FoodTracker] Inputs are not valid. Pawn Null: {pawn == null} | Food Null: {food == null} " +
+                        $"| Food Destroyed: {food?.Destroyed ?? false}");
 
                 return false;
             }
 
             if (!pawn.RaceProps.Humanlike)
-            {
-                if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker] {pawn.Label} is not human, returning to EatingPatch.");
-
                 return false;
-            }
 
             if (!food.def.IsNutritionGivingIngestible)
-            {
-                if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker] {food?.def?.defName ?? "NULL"} gives no nutrition, returning to EatingPatch.");
-
                 return false;
-            }
 
             return true;
         }
 
         // This method retrieves the remaining nutrition value of a given food Thing. It returns 0 if the Thing is null,
-        // destroyed or if the Thing has a CompPartialNutrition component.  It returns the remaining nutrition value from that component. 
+        // destroyed or if the Thing does not have a CompPartialNutrition component.  It returns the remaining nutrition value from that component. 
         public static float GetRemainingNutrition(Thing food)
         {
             if (food == null || food.Destroyed)
             {
-                Log.Warning($"[FoodTracker] Input is not valid. Food: {food?.def?.defName ?? "NULL"}, Food ID: " +
-                    $"{food?.thingIDNumber ?? 0}, Food Destroyed: {food?.Destroyed ?? false}");
+                Log.Warning($"[FoodTracker] Input is not valid. Food Null: {food == null} | Food Destroyed: {food?.Destroyed ?? false}");
 
                 return 0f;
             }
@@ -88,7 +85,7 @@ namespace FoodTracker
 
             if (nutritionTracker == null)
             {
-                Log.Warning($"[FoodTracker] Component missing from {food?.def?.defName ?? "NULL"}. Food ID: {food.thingIDNumber}");
+                Log.Warning($"[FoodTracker] Component missing from {food?.def?.defName ?? "NULL"} (ID {food.thingIDNumber})");
 
                 return 0f;
             }
@@ -100,10 +97,10 @@ namespace FoodTracker
         // If the Thing is null, destroyed, or does not have a CompPartialNutrition component, it does nothing.
         public static void SetRemainingNutrition(Thing food, float nutrition)
         {
-            if (food == null || food.Destroyed)
+            if (food == null || food.Destroyed || nutrition <= 0f)
             {
-                Log.Warning($"[FoodTracker] Input is not valid. Food: {food?.def?.defName ?? "NULL"}, Food ID: " +
-                    $"{food?.thingIDNumber ?? 0}, Food Destroyed: {food?.Destroyed ?? false}");
+                Log.Warning($"[FoodTracker] Inputs are not valid. Food Null: {food?.def?.defName ?? "NULL"} " +
+                    $"| Food Destroyed: {food?.Destroyed ?? false} | Nutrition: {nutrition:F4}");
 
                 return;
             }
@@ -111,7 +108,7 @@ namespace FoodTracker
 
             if (nutritionTracker == null)
             {
-                Log.Warning($"[FoodTracker] Component missing from {food?.def?.defName ?? "NULL"}. Food ID: {food.thingIDNumber}");
+                Log.Warning($"[FoodTracker] Component missing from {food?.def?.defName ?? "NULL"} (ID {food.thingIDNumber})");
 
                 return;
             }
@@ -124,18 +121,19 @@ namespace FoodTracker
         {
             if (pawn == null || nutrition < 0f)
             {
-                Log.Warning($"[FoodTracker] Input is not valid. Pawn: {pawn?.Label ?? "NULL"}, Nutrition: {nutrition}");
+                Log.Warning($"[FoodTracker] Inputs are not valid. Pawn: {pawn == null} | Nutrition: {nutrition:F4}");
 
                 return;
             }
 
-            if (pawn.needs?.food == null || pawn.needs.food.CurLevel < 0f || pawn.records == null)
+            if (pawn.needs?.food == null || pawn.records == null || pawn.needs.food.CurLevel < 0f)
             {
-                Log.Warning($"[FoodTracker] Cannot apply nutrition bookkeeping to {pawn.Label}.");
+                Log.Warning($"[FoodTracker] Cannot apply nutrition to {pawn.LabelShort}. Pawn Needs Null: {pawn.needs?.food == null} " +
+                    $"| Pawn Records Null: {pawn.records == null}| Pawn Needs Level: {pawn.needs.food.CurLevel:F4}");
 
                 return;
             }
-
+            
             float currentHungerLevel = pawn.needs.food.CurLevel;
             float maxHungerLevel = pawn.needs.food.MaxLevel; // 1.0 for humans
             float roomInStomach = maxHungerLevel - currentHungerLevel;

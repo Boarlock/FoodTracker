@@ -30,8 +30,7 @@ namespace FoodTracker
 
             if (nutritionPerItem <= 0f || ingestCount <= 0)
             {
-                Log.Warning($"[FoodTracker] Invalid nutrition or stack: Pawn: {chewer.Label}, Food: {food?.def?.defName ?? "NULL"} " +
-                    $"Food ID: {food?.thingIDNumber ?? 0}, Nutrition Per Item: {__state?.NutritionPerItem ?? 0}, Count: {__state?.IngestCount ?? 0}");
+                Log.Warning($"[FoodTracker] Inputs are not valid. Nutrition Per Item: {nutritionPerItem:F4} | Ingest Count: {ingestCount}");
 
                 return;
             }
@@ -51,7 +50,8 @@ namespace FoodTracker
                 durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
 
                 if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker] Batch food detected. Scaling eating duration to {durationMultiplier:P0}");
+                    Log.Message($"[FoodTracker] Eating duration: {originalDef.defName} (ID {food.ThingID}) " +
+                        $"| Total Nutrition: {__state.TotalNutrition:F2} | Multiplier: {durationMultiplier:P0}");
 
                 return;
             }
@@ -75,7 +75,8 @@ namespace FoodTracker
                 durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
 
                 if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker] Non-Tracked meal detected. Scaling eating duration to {durationMultiplier:P0}");
+                    Log.Message($"[FoodTracker] Eating duration: {originalDef.defName} (ID {food.ThingID}) " +
+                        $"| Total Nutrition: {__state.TotalNutrition:F2} | Multiplier: {durationMultiplier:P0}");
 
                 return;
             }
@@ -98,7 +99,8 @@ namespace FoodTracker
             durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / FoodTrackingHelpers.NutritionConsumptionRateMultiplier);
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker] Tracked meal detected. Scaling eating duration to {durationMultiplier:P0}");
+                Log.Message($"[FoodTracker] Eating duration: {originalDef.defName} (ID {food.ThingID}) " +
+                    $"| Available Nutrition: {__state.TotalNutrition:F2} | Multiplier: {durationMultiplier:P0}");
 
         }
 
@@ -152,12 +154,15 @@ namespace FoodTracker
 
                 FoodTrackerIngestionTracker.Register(state);
 
-                if (FoodTrackerSettings.Verbose)
-                {
-                    Log.Message($"[FoodTracker] Eating toil has started. Pawn: {state.Pawn}, Ingest Count: {state.IngestCount}, " +
-                        $"Remaining Nutrition: {state.NutritionAtStart:F2}, Food: {state.MealDef.defName}, Food ID: {state.Food.thingIDNumber}");
-                }
+                if (FoodTrackerSettings.Verbose && food.TryGetComp<CompPartialNutrition>() == null)
+                    Log.Message($"[FoodTracker] Eating started: {state.MealDef.defName} (ID {state.Food.thingIDNumber}) " +
+                        $"| Pawn: {state.Pawn} | Ingest Count: {state.IngestCount} | Nutrition Per Item: {state.NutritionPerItem:F2}" +
+                        $"| Total Nutrition: {state.TotalNutrition:F2}");
 
+                if (FoodTrackerSettings.Verbose)
+                    Log.Message($"[FoodTracker] Eating started: {state.MealDef.defName} (ID {state.Food.thingIDNumber}) " +
+                        $"| Pawn: {state.Pawn} | Ingest Count: {state.IngestCount} | Nutrition Per Item: {state.NutritionPerItem:F2}" +
+                        $"| Available Nutrition: {state.TotalNutrition:F2}");
             };
 
             toil.AddFinishAction(() =>
@@ -209,15 +214,12 @@ namespace FoodTracker
     {
         public static void Handle(IngestionState state)
         {
+
+            // If food doesn't carry our component there is nothing to change.
             if (state?.Food?.TryGetComp<CompPartialNutrition>() == null)
-            {
-                if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker] {state?.MealDef.defName ?? "NULL"} is not a tracked partial meal or, has no " +
-                        $"corresponding partial meal reference. letting vanilla handle it. Food ID: {state?.Food?.thingIDNumber ?? 0}");
-
                 return;
-            }
 
+            // Calculate correction based off how mnuch nutrition should be applied, and how mucn was applied.
             float vanillaNutritionAdded = state.Pawn.needs.food.CurLevel - state.HungerAtStart;
             float correction = state.NutritionAtStart - vanillaNutritionAdded;
             float trueNutritionConsumed = vanillaNutritionAdded + correction;
@@ -225,8 +227,9 @@ namespace FoodTracker
             FoodTrackingHelpers.ApplyNutritionToPawn(state.Pawn, correction);
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker] Nutrition has been exhausted for {state.MealDef.defName}. Nutrition Consumed: " +
-                    $"{trueNutritionConsumed:F2}, Food ID: {state.Food.thingIDNumber}");
+                Log.Message($"[FoodTracker] Eating Completed: {state.MealDef.defName} (ID {state.Food.thingIDNumber}) " +
+                    $"| Nutrition Consumed: {trueNutritionConsumed:F2} | Vanilla Added: {vanillaNutritionAdded:F2} " +
+                    $"| Correction Applied: {correction:F2}");
         }
     }
 }
