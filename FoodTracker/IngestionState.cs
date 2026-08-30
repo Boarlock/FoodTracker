@@ -12,7 +12,8 @@ namespace FoodTracker
 
         // Captured during Prefix while the Food Thing is still reliable.
         public Thing Food;
-        public ThingDef MealDef;
+        public ThingDef FoodDef;
+        public ThingDef BaseDef;
         public ThingDef TrackerDef;
         public float NutritionAtStart;
         public float NutritionPerItem;

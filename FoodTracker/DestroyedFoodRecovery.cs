@@ -9,10 +9,10 @@ namespace FoodTracker
         public static void HandleDestroyedMeal(IngestionState state)
         {
             // Validate inputs
-            if (state == null || state.Pawn == null || state.MealDef == null)
+            if (state == null || state.Pawn == null || state.FoodDef == null)
             {
                 Log.Warning($"[FoodTracker][T{state.TraceID}] Inputs are not valid. State Null: {state == null} " +
-                    $"| Pawn Null: {state.Pawn == null} | ThingDef Null: {state.MealDef == null}");
+                    $"| Pawn Null: {state.Pawn == null} | ThingDef Null: {state.FoodDef == null}");
 
                 return;
             }
@@ -41,7 +41,7 @@ namespace FoodTracker
                 if (thing == null || thing.Destroyed)
                     continue;
 
-                if (thing.def != state.MealDef)
+                if (thing.def != state.FoodDef)
                     continue;
 
                 if (!thing.def.IsNutritionGivingIngestible)
@@ -55,7 +55,7 @@ namespace FoodTracker
             // If surviving stack cannot be found 
             if (survivingStack == null)
             {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Could not find a surviving {state?.MealDef?.defName ?? "NULL"} (ID {state?.Food?.thingIDNumber ?? 0}) stack at {state.FoodCell}.");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Could not find a surviving {state?.FoodDef?.defName ?? "NULL"} (ID {state?.Food?.thingIDNumber ?? 0}) stack at {state.FoodCell}.");
 
                 return;
             }
@@ -88,7 +88,7 @@ namespace FoodTracker
             }
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.MealDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
+                Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
                     $"Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
                     $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} | Total Remaining: {(state.TotalNutrition - nutritionEaten):F2} " +
                     $"| Partial Meal: {partialMeal.def.defName} (ID {partialMeal.thingIDNumber}) | Partial Nutrition: {partialMealNutrition:F2} " +
@@ -108,10 +108,10 @@ namespace FoodTracker
 
         public static void HandleDestroyedBatchFood(IngestionState state)
         {
-            if (state == null || state.Pawn == null || state.MealDef == null)
+            if (state == null || state.Pawn == null || state.FoodDef == null)
             {
                 Log.Warning($"[FoodTracker][T{state.TraceID}] Inputs are not valid. State Null: {state == null} " +
-                    $"| Pawn Null: {state.Pawn == null} | ThingDef Null: {state.MealDef == null}");
+                    $"| Pawn Null: {state.Pawn == null} | ThingDef Null: {state.FoodDef == null}");
 
                 return;
             }
@@ -144,7 +144,7 @@ namespace FoodTracker
                 if (thing == null || thing.Destroyed)
                     continue;
 
-                if (thing.def != state.MealDef)
+                if (thing.def != state.FoodDef)
                     continue;
 
                 if (!thing.def.IsNutritionGivingIngestible)
@@ -158,7 +158,7 @@ namespace FoodTracker
             // If surviving stack cannot be found 
             if (survivingStack == null)
             {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Could not find a surviving {state?.MealDef?.defName ?? "NULL"} (ID {state?.Food?.thingIDNumber ?? 0}) stack at {state.FoodCell}.");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Could not find a surviving {state?.FoodDef?.defName ?? "NULL"} (ID {state?.Food?.thingIDNumber ?? 0}) stack at {state.FoodCell}.");
 
                 return;
             }
@@ -176,7 +176,7 @@ namespace FoodTracker
                 survivingStack.stackCount -= itemsToRemove;
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.MealDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
+                Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
                     $"Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
                     $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} " +
                     $"| Total Remaining: {(state.NutritionPerItem * (state.IngestCount - wholeItemsEaten)):F2} " +

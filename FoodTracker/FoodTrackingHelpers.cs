@@ -20,17 +20,17 @@ namespace FoodTracker
         // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
         public static ThingDef GetOriginalMealDef(IngestionState state)
         {
-            if (state.MealDef == null)
+            if (state.FoodDef == null)
             {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Input is not valid. ThingDef Null: {state.MealDef == null}");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Input is not valid. ThingDef Null: {state.FoodDef == null}");
 
                 return null;
             }
 
-            if (!state.MealDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
-                return state.MealDef;
+            if (!state.FoodDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
+                return state.FoodDef;
 
-            string originalDefName = state.MealDef.defName[DynamicMealDefFactory.Prefix.Length..];
+            string originalDefName = state.FoodDef.defName[DynamicMealDefFactory.Prefix.Length..];
 
             return DefDatabase<ThingDef>.GetNamedSilentFail(originalDefName);
         }
@@ -38,35 +38,34 @@ namespace FoodTracker
         // Determines if the target food is a batch food item that should not be subdivided into partials.
         public static bool IsBatchFood(IngestionState state)
         {
-            if (state.MealDef == null)
+            if (state.BaseDef == null)
             {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Input is not valid. ThingDef Null: {state.MealDef == null}");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Input is not valid. ThingDef Null: {state.BaseDef == null}");
 
                 return false;
             }
 
-            ThingDef originalDef = GetOriginalMealDef(state);
-            float nutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
+            float nutrition = state.BaseDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
 
             return nutrition < MealQualifierThreshold;
         }
 
-        public static bool ValidateFoodEatingAttempt(IngestionState state)
+        public static bool ValidateFoodEatingAttempt(Pawn pawn, Thing food)
         {
 
-            if (state.Pawn == null || state.Food == null || state.Food.Destroyed)
+            if (pawn == null || food == null || food.Destroyed)
             {
                 if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker][T{state.TraceID}] Inputs are not valid. Pawn Null: {state.Pawn == null} | Food Null: {state.Food == null} " +
-                        $"| Food Destroyed: {state.Food?.Destroyed ?? false}");
+                    Log.Message($"[FoodTracker] Inputs are not valid. Pawn Null: {pawn == null} | Food Null: {food == null} " +
+                        $"| Food Destroyed: {food?.Destroyed ?? false}");
 
                 return false;
             }
 
-            if (!state.Pawn.RaceProps.Humanlike)
+            if (!pawn.RaceProps.Humanlike)
                 return false;
 
-            if (!state.Food.def.IsNutritionGivingIngestible)
+            if (!food.def.IsNutritionGivingIngestible)
                 return false;
 
             return true;

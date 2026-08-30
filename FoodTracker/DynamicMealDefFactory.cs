@@ -1,8 +1,8 @@
-﻿using System.IO;
-using Verse;
-using RimWorld;
-using UnityEngine;
+﻿using RimWorld;
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using Verse;
 
 namespace FoodTracker
 {
@@ -12,15 +12,15 @@ namespace FoodTracker
 
         public static ThingDef CreateTrackerMeal(IngestionState state)
         {
-            if (state.MealDef == null)
+            if (state.FoodDef == null)
                 return null;
 
             // Make the new tracker def name
-            string newDefName = Prefix + state.MealDef.defName;
+            string newDefName = Prefix + state.FoodDef.defName;
 
             // Already a generated FoodTracker def.
-            if (state.MealDef.defName.StartsWith(Prefix))
-                return state.MealDef;
+            if (state.FoodDef.defName.StartsWith(Prefix))
+                return state.FoodDef;
 
             // Look for the canonical generated def for the ORIGINAL food.
             ThingDef existingDef = DefDatabase<ThingDef>.GetNamedSilentFail(newDefName);
@@ -28,31 +28,45 @@ namespace FoodTracker
                 return existingDef;
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{state.TraceID}] ThingDef cloning is underway. {state.MealDef.defName} has been received, {newDefName} will be created.");
+                Log.Message($"[FoodTracker][T{state.TraceID}] ThingDef cloning is underway. {state.FoodDef.defName} has been received, {newDefName} will be created.");
 
             // Clone the ThingDef with all of it's references, fields, data, etc..
-            ThingDef childDef = Gen.MemberwiseClone(state.MealDef);
+            ThingDef childDef = Gen.MemberwiseClone(state.FoodDef);
 
             // Make the partial meal Un-Stackable, set the name, append partial to description
             childDef.defName = newDefName;
-            childDef.stackLimit = 1;
-            childDef.description = state.MealDef.description + " (Partial)";
+//            childDef.stackLimit = 1;
+            childDef.description = state.FoodDef.description + " (Partial)";
 
             // Set the tracking component
-            if (state.MealDef.comps != null)
-                childDef.comps = new List<CompProperties>(state.MealDef.comps);
+            if (state.FoodDef.comps != null)
+                childDef.comps = new List<CompProperties>(state.FoodDef.comps);
             else
                 childDef.comps = new List<CompProperties>();
 
             childDef.comps.Add(new CompProperties_PartialNutrition());
+            childDef.comps.Add(new CompProperties_FoodTracker());
 
             // A new Def needs its own hash.
             childDef.shortHash = 0;
             childDef.ResolveDefNameHash();
             childDef.ResolveReferences();
+            childDef.generated = true;
 
-            // Add the new MealDef to the Database
+            // Add the new FoodTracker Def to the Database
             DefDatabase<ThingDef>.Add(childDef);
+
+            // Register the new ThingDef with its ThingCategoryDef(s)
+            foreach (ThingCategoryDef category in childDef.thingCategories)
+            {
+                if (!category.childThingDefs.Contains(childDef))
+                {
+                    category.childThingDefs.Add(childDef);
+                }
+            }
+
+            // Because meals are counted as resources we need to update resource center with out new ThingDef
+            ResourceCounter.ResetDefs();
 
             if (FoodTrackerSettings.Verbose)
                 Log.Message($"[FoodTracker][T{state.TraceID}] ThingDef {childDef.defName} has been successfully created.");

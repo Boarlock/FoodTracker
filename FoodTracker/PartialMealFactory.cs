@@ -70,7 +70,7 @@ namespace FoodTracker
             }
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{state.TraceID}] Partial meal created: {state.MealDef.defName} (ID {state.Food.thingIDNumber}) " +
+                Log.Message($"[FoodTracker][T{state.TraceID}] Partial meal created: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
                     $"| Nutrition: {remainingNutrition:F2}");
 
             return resultingThing;
@@ -81,9 +81,9 @@ namespace FoodTracker
         {
 
             // Validate the input parameters.
-            if (state == null || state.Pawn == null || state.MealDef == null)
+            if (state == null || state.Pawn == null || state.FoodDef == null)
             {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Inputs are not valid. State Null: {state == null} | Pawn Null: {state?.Pawn == null} | ThingDef Null: {state?.MealDef == null}");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Inputs are not valid. State Null: {state == null} | Pawn Null: {state?.Pawn == null} | ThingDef Null: {state?.FoodDef == null}");
 
                 return null;
             }
@@ -94,7 +94,7 @@ namespace FoodTracker
             if (partialDef == null)
             {
 
-                Log.Warning($"[FoodTracker][T{state.TraceID}] No corresponding partial meal found for {state?.MealDef?.defName ?? "NULL"} (ID {state?.Food?.thingIDNumber ?? 0}).");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] No corresponding partial meal found for {state?.FoodDef?.defName ?? "NULL"} (ID {state?.Food?.thingIDNumber ?? 0}).");
 
                 return null;
             }
@@ -140,7 +140,7 @@ namespace FoodTracker
             }
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{state.TraceID}] Partial meal created: {state.MealDef.defName} (ID {state.Food.thingIDNumber}) " +
+                Log.Message($"[FoodTracker][T{state.TraceID}] Partial meal created: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
                     $"| Nutrition: {remainingNutrition:F2}");
 
             return resultingThing;
