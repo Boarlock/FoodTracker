@@ -17,20 +17,39 @@ namespace FoodTracker
         // This is a number we use to scale eating duration time.
         public const float NutritionConsumptionRateMultiplier = 0.90f;
 
-        // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
-        public static ThingDef GetOriginalMealDef(IngestionState state)
+        // Corrects a nutrition list or corrupted list if our list doesn't match the FoodTracker_ items in a stack.
+        public static void CorrectNutritionList(Thing thing, CompFoodTracker foodTracker)
         {
-            if (state.FoodDef == null)
+            // Cllear the elements out of the corrupted list.
+            foodTracker.NutritionEntries.Clear();
+
+            // Return the original (base def) of each item in the list.
+            ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(thing.def);
+
+            // Store the full nutrition of each base item.
+            float nutritionPerItem = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0;
+
+            for (int i = 0; i < thing.stackCount; i++)
             {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Input is not valid. ThingDef Null: {state.FoodDef == null}");
+                // Store each nutrition value to their respective element in the list.
+                foodTracker.NutritionEntries.Add(nutritionPerItem);
+            }
+        }
+
+        // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
+        public static ThingDef GetOriginalMealDef(ThingDef mealDef)
+        {
+            if (mealDef == null)
+            {
+                Log.Warning($"[FoodTracker] Input is not valid. ThingDef Null: {mealDef == null}");
 
                 return null;
             }
 
-            if (!state.FoodDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
-                return state.FoodDef;
+            if (!mealDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
+                return mealDef;
 
-            string originalDefName = state.FoodDef.defName[DynamicMealDefFactory.Prefix.Length..];
+            string originalDefName = mealDef.defName[DynamicMealDefFactory.Prefix.Length..];
 
             return DefDatabase<ThingDef>.GetNamedSilentFail(originalDefName);
         }
@@ -69,52 +88,6 @@ namespace FoodTracker
                 return false;
 
             return true;
-        }
-
-        // This method retrieves the remaining nutrition value of a given food Thing. It returns 0 if the Thing is null,
-        // destroyed or if the Thing does not have a CompPartialNutrition component.  It returns the remaining nutrition value from that component. 
-        public static float GetRemainingNutrition(IngestionState state)
-        {
-            if (state.Food == null || state.Food.Destroyed)
-            {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Input is not valid. Food Null: {state.Food == null} | Food Destroyed: {state.Food?.Destroyed ?? false}");
-
-                return 0f;
-            }
-
-            CompPartialNutrition nutritionTracker = state.Food.TryGetComp<CompPartialNutrition>();
-
-            if (nutritionTracker == null)
-            {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Component missing from {state.Food?.def?.defName ?? "NULL"} (ID {state.Food.thingIDNumber})");
-
-                return 0f;
-            }
-
-            return nutritionTracker.RemainingNutrition;
-        }
-
-        // This calls a method in CompPartialNutrition to set the remaining nutrition value of a food Thing.
-        // If the Thing is null, destroyed, or does not have a CompPartialNutrition component, it does nothing.
-        public static void SetRemainingNutrition(IngestionState state, float nutrition)
-        {
-            if (state.Food == null || state.Food.Destroyed || nutrition < 0f)
-            {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Inputs are not valid. Food Null: {state.Food?.def?.defName ?? "NULL"} " +
-                    $"| Food Destroyed: {state.Food?.Destroyed ?? false} | Nutrition: {nutrition:F4}");
-
-                return;
-            }
-            CompPartialNutrition nutritionTracker = state.Food.TryGetComp<CompPartialNutrition>();
-
-            if (nutritionTracker == null)
-            {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Component missing from {state.Food?.def?.defName ?? "NULL"} (ID {state.Food.thingIDNumber})");
-
-                return;
-            }
-
-            nutritionTracker.SetRemainingNutrition(nutrition);
         }
 
         // Method to check pawn and nutrition for invalid values, and apply nutrition to pawn.

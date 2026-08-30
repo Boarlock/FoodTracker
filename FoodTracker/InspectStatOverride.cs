@@ -18,12 +18,12 @@ namespace FoodTracker
             if (thing.def.defName.StartsWith(DynamicMealDefFactory.Prefix) == false)
                 return true;
 
-            CompPartialNutrition comp = thing.TryGetComp<CompPartialNutrition>();
+            CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
 
-            if (comp == null)
+            if (tracker == null)
                 return true;
 
-            __result = comp.RemainingNutrition;
+            __result = tracker.RemainingNutrition;
             return false;
         }
     }

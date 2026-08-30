@@ -41,7 +41,7 @@ namespace FoodTracker
             int ingestCount = curJob?.count ?? 0;
             __state.IngestCount = ingestCount;
 
-            ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(__state);
+            ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(food.def);
             float nutritionPerItem = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
             float totalNutrition = ingestCount * nutritionPerItem;
 
@@ -67,7 +67,7 @@ namespace FoodTracker
             __state.TrackerDef = trackerDef;
 
             // If this is not a FoodTracker meal, then it's a full meal. 
-            if (food.TryGetComp<CompPartialNutrition>() == null)
+            if (food.TryGetComp<CompFoodTracker>() == null)
             {
 
                 // Calculate eating duration off total nutrition being consumed.
@@ -80,9 +80,9 @@ namespace FoodTracker
                 return;
             }
 
-            float nutritionAtStart = FoodTrackingHelpers.GetRemainingNutrition(__state);
-
-            // Otherwise it is a tracked meal and we need to calclate remaining nutrition and eating duration.
+            // Get our comp to access nutrition values, set NutritionAtStart to RemainingNutrition.
+            CompFoodTracker tracker = food.TryGetComp<CompFoodTracker>();
+            float nutritionAtStart = tracker.RemainingNutrition;
             __state.NutritionAtStart = nutritionAtStart;
             
 
@@ -144,7 +144,7 @@ namespace FoodTracker
 
                 FoodTrackerIngestionTracker.Register(state);
 
-                if (FoodTrackerSettings.Verbose && food.TryGetComp<CompPartialNutrition>() == null)
+                if (FoodTrackerSettings.Verbose && food.TryGetComp<CompFoodTracker>() == null)
                 {
                     Log.Message($"[FoodTracker][T{state.TraceID}] Eating started: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
                         $"| Pawn: {state.Pawn} | Ingest Count: {state.IngestCount} | Nutrition Per Item: {state.NutritionPerItem:F2}" +
@@ -210,7 +210,7 @@ namespace FoodTracker
         {
 
             // If food doesn't carry our component there is nothing to change.
-            if (state?.Food?.TryGetComp<CompPartialNutrition>() == null)
+            if (state?.Food?.TryGetComp<CompFoodTracker>() == null)
                 return;
 
             // Calculate correction based off how mnuch nutrition should be applied, and how mucn was applied.

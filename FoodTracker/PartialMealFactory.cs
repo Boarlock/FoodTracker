@@ -26,11 +26,12 @@ namespace FoodTracker
                 return null;
             }
 
-            // Create a new partial meal Thing using the partial meal definition.
+            // Create a new partial meal Thing using the partial meal definition and get the tracker comp for it.
             Thing food = ThingMaker.MakeThing(partialDef);
+            CompFoodTracker tracker = food.TryGetComp<CompFoodTracker>();
 
             // If created item doesn't for any reason contain our component then delete it.
-            if (food.TryGetComp<CompPartialNutrition>() == null)
+            if (tracker == null)
             {
                 Log.Warning($"[FoodTracker][T{state.TraceID}] Component missing from {food?.def?.defName ?? "NULL"} (ID {food.thingIDNumber})");
 
@@ -43,7 +44,7 @@ namespace FoodTracker
             }
 
             // Set the remaining nutrition of the partial meal to the provided value.
-            FoodTrackingHelpers.SetRemainingNutrition(state, remainingNutrition);
+            tracker.SetRemainingNutrition(remainingNutrition);
 
             // Get the cell of the pawn to determine where to drop the new partial meal.
             IntVec3 dropCell = state.Pawn.Position;
@@ -99,11 +100,12 @@ namespace FoodTracker
                 return null;
             }
 
-            // Create the new partial meal.
+            // Create the new partial meal and get the comp for it.
             Thing food = ThingMaker.MakeThing(partialDef);
+            CompFoodTracker tracker = food.TryGetComp<CompFoodTracker>();
 
             // Verify the component exists before attempting to use it.
-            if (food.TryGetComp<CompPartialNutrition>() == null)
+            if (tracker == null)
             {
 
                 Log.Warning($"[FoodTracker][T{state.TraceID}] Component missing from {food?.def?.defName ?? "NULL"} (ID {food.thingIDNumber})");
@@ -117,7 +119,7 @@ namespace FoodTracker
             }
 
             // Store the nutrition remaining in the partial meal.
-            FoodTrackingHelpers.SetRemainingNutrition(state, remainingNutrition);
+            tracker.SetRemainingNutrition(remainingNutrition);
 
             // Drop the new partial meal into the world.
             if (!GenDrop.TryDropSpawn(food, state.FoodCell, state.Pawn.Map, ThingPlaceMode.Near, out Thing resultingThing))

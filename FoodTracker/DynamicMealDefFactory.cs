@@ -44,7 +44,6 @@ namespace FoodTracker
             else
                 childDef.comps = new List<CompProperties>();
 
-            childDef.comps.Add(new CompProperties_PartialNutrition());
             childDef.comps.Add(new CompProperties_FoodTracker());
 
             RegisterGeneratedThingDef(childDef);

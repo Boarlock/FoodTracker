@@ -92,8 +92,10 @@ namespace FoodTracker
 
             itemsToRemove = Mathf.Min(Mathf.CeilToInt(itemsEatenExact), state.Food.stackCount);
 
+            CompFoodTracker tracker = state.Food.TryGetComp<CompFoodTracker>();
+
             // If meal doesn't have our component we have to spawn a new meal with out tracked ThingDef.
-            if (state.Food.TryGetComp<CompPartialNutrition>() == null)
+            if (tracker == null)
             {
 
                 // Create a new Thing to represent the new meal, and drop it in the world.
@@ -136,7 +138,7 @@ namespace FoodTracker
             }
 
             // Set remaining nutrition on the partial meal
-            FoodTrackingHelpers.SetRemainingNutrition(state, partialMealNutrition);
+            tracker.SetRemainingNutrition(partialMealNutrition);
 
             if (FoodTrackerSettings.Verbose)
                 Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
