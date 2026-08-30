@@ -8,6 +8,19 @@ namespace FoodTracker
 
         public List<float> NutritionEntries = new List<float>();
 
+        public override void PostExposeData()
+        {
+            base.PostExposeData();
+
+            Scribe_Collections.Look(ref NutritionEntries, "nutritionEntries", LookMode.Value);
+
+            if (Scribe.mode == LoadSaveMode.PostLoadInit &&
+                NutritionEntries == null)
+            {
+                NutritionEntries = new List<float>();
+            }
+        }
+
     }
 
     public class CompProperties_FoodTracker : CompProperties

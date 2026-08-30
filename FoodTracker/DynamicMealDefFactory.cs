@@ -47,6 +47,17 @@ namespace FoodTracker
             childDef.comps.Add(new CompProperties_PartialNutrition());
             childDef.comps.Add(new CompProperties_FoodTracker());
 
+            RegisterGeneratedThingDef(childDef);
+            
+            if (FoodTrackerSettings.Verbose)
+                Log.Message($"[FoodTracker][T{state.TraceID}] ThingDef {childDef.defName} has been successfully created.");
+
+            return childDef;
+        }
+
+        private static void RegisterGeneratedThingDef(ThingDef childDef)
+        {
+
             // A new Def needs its own hash.
             childDef.shortHash = 0;
             childDef.ResolveDefNameHash();
@@ -56,22 +67,20 @@ namespace FoodTracker
             // Add the new FoodTracker Def to the Database
             DefDatabase<ThingDef>.Add(childDef);
 
-            // Register the new ThingDef with its ThingCategoryDef(s)
+            // Register the new ThingDef with its ThingCategoryDefs
             foreach (ThingCategoryDef category in childDef.thingCategories)
             {
                 if (!category.childThingDefs.Contains(childDef))
                 {
                     category.childThingDefs.Add(childDef);
                 }
+
+                // Rebuild the category's cached ThingDef lists
+                category.ResolveReferences();
             }
 
-            // Because meals are counted as resources we need to update resource center with out new ThingDef
+            // Because meals are counted as resources we need to update resource center with our new ThingDef
             ResourceCounter.ResetDefs();
-
-            if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{state.TraceID}] ThingDef {childDef.defName} has been successfully created.");
-
-            return childDef;
         }
     }
 }

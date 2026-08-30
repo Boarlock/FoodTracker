@@ -98,7 +98,7 @@ namespace FoodTracker
         // If the Thing is null, destroyed, or does not have a CompPartialNutrition component, it does nothing.
         public static void SetRemainingNutrition(IngestionState state, float nutrition)
         {
-            if (state.Food == null || state.Food.Destroyed || nutrition <= 0f)
+            if (state.Food == null || state.Food.Destroyed || nutrition < 0f)
             {
                 Log.Warning($"[FoodTracker][T{state.TraceID}] Inputs are not valid. Food Null: {state.Food?.def?.defName ?? "NULL"} " +
                     $"| Food Destroyed: {state.Food?.Destroyed ?? false} | Nutrition: {nutrition:F4}");
