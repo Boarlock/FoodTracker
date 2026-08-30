@@ -5,7 +5,9 @@ using Verse;
 namespace FoodTracker
 {
     public static class FoodTrackingHelpers
+
     {
+
         // If nutrition is below this threshold treat as interrupted, otherwise FoodTracker does not interfere with ingestion completion.
         public const float MealCompletionThreshold = 0.99f;
 
@@ -16,55 +18,55 @@ namespace FoodTracker
         public const float NutritionConsumptionRateMultiplier = 0.90f;
 
         // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
-        public static ThingDef GetOriginalMealDef(ThingDef foodDef)
+        public static ThingDef GetOriginalMealDef(IngestionState state)
         {
-            if (foodDef == null)
+            if (state.MealDef == null)
             {
-                Log.Warning($"[FoodTracker] Input is not valid. ThingDef Null: {foodDef == null}");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Input is not valid. ThingDef Null: {state.MealDef == null}");
 
                 return null;
             }
 
-            if (!foodDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
-                return foodDef;
+            if (!state.MealDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
+                return state.MealDef;
 
-            string originalDefName = foodDef.defName[DynamicMealDefFactory.Prefix.Length..];
+            string originalDefName = state.MealDef.defName[DynamicMealDefFactory.Prefix.Length..];
 
             return DefDatabase<ThingDef>.GetNamedSilentFail(originalDefName);
         }
 
         // Determines if the target food is a batch food item that should not be subdivided into partials.
-        public static bool IsBatchFood(ThingDef foodDef)
+        public static bool IsBatchFood(IngestionState state)
         {
-            if (foodDef == null)
+            if (state.MealDef == null)
             {
-                Log.Warning($"[FoodTracker] Input is not valid. ThingDef Null: {foodDef == null}");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Input is not valid. ThingDef Null: {state.MealDef == null}");
 
                 return false;
             }
 
-            ThingDef originalDef = GetOriginalMealDef(foodDef);
+            ThingDef originalDef = GetOriginalMealDef(state);
             float nutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
 
             return nutrition < MealQualifierThreshold;
         }
 
-        public static bool ValidateFoodEatingAttempt(Pawn pawn, Thing food)
+        public static bool ValidateFoodEatingAttempt(IngestionState state)
         {
 
-            if (pawn == null || food == null || food.Destroyed)
+            if (state.Pawn == null || state.Food == null || state.Food.Destroyed)
             {
                 if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker] Inputs are not valid. Pawn Null: {pawn == null} | Food Null: {food == null} " +
-                        $"| Food Destroyed: {food?.Destroyed ?? false}");
+                    Log.Message($"[FoodTracker][T{state.TraceID}] Inputs are not valid. Pawn Null: {state.Pawn == null} | Food Null: {state.Food == null} " +
+                        $"| Food Destroyed: {state.Food?.Destroyed ?? false}");
 
                 return false;
             }
 
-            if (!pawn.RaceProps.Humanlike)
+            if (!state.Pawn.RaceProps.Humanlike)
                 return false;
 
-            if (!food.def.IsNutritionGivingIngestible)
+            if (!state.Food.def.IsNutritionGivingIngestible)
                 return false;
 
             return true;
@@ -72,20 +74,20 @@ namespace FoodTracker
 
         // This method retrieves the remaining nutrition value of a given food Thing. It returns 0 if the Thing is null,
         // destroyed or if the Thing does not have a CompPartialNutrition component.  It returns the remaining nutrition value from that component. 
-        public static float GetRemainingNutrition(Thing food)
+        public static float GetRemainingNutrition(IngestionState state)
         {
-            if (food == null || food.Destroyed)
+            if (state.Food == null || state.Food.Destroyed)
             {
-                Log.Warning($"[FoodTracker] Input is not valid. Food Null: {food == null} | Food Destroyed: {food?.Destroyed ?? false}");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Input is not valid. Food Null: {state.Food == null} | Food Destroyed: {state.Food?.Destroyed ?? false}");
 
                 return 0f;
             }
 
-            CompPartialNutrition nutritionTracker = food.TryGetComp<CompPartialNutrition>();
+            CompPartialNutrition nutritionTracker = state.Food.TryGetComp<CompPartialNutrition>();
 
             if (nutritionTracker == null)
             {
-                Log.Warning($"[FoodTracker] Component missing from {food?.def?.defName ?? "NULL"} (ID {food.thingIDNumber})");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Component missing from {state.Food?.def?.defName ?? "NULL"} (ID {state.Food.thingIDNumber})");
 
                 return 0f;
             }
@@ -95,20 +97,20 @@ namespace FoodTracker
 
         // This calls a method in CompPartialNutrition to set the remaining nutrition value of a food Thing.
         // If the Thing is null, destroyed, or does not have a CompPartialNutrition component, it does nothing.
-        public static void SetRemainingNutrition(Thing food, float nutrition)
+        public static void SetRemainingNutrition(IngestionState state, float nutrition)
         {
-            if (food == null || food.Destroyed || nutrition <= 0f)
+            if (state.Food == null || state.Food.Destroyed || nutrition <= 0f)
             {
-                Log.Warning($"[FoodTracker] Inputs are not valid. Food Null: {food?.def?.defName ?? "NULL"} " +
-                    $"| Food Destroyed: {food?.Destroyed ?? false} | Nutrition: {nutrition:F4}");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Inputs are not valid. Food Null: {state.Food?.def?.defName ?? "NULL"} " +
+                    $"| Food Destroyed: {state.Food?.Destroyed ?? false} | Nutrition: {nutrition:F4}");
 
                 return;
             }
-            CompPartialNutrition nutritionTracker = food.TryGetComp<CompPartialNutrition>();
+            CompPartialNutrition nutritionTracker = state.Food.TryGetComp<CompPartialNutrition>();
 
             if (nutritionTracker == null)
             {
-                Log.Warning($"[FoodTracker] Component missing from {food?.def?.defName ?? "NULL"} (ID {food.thingIDNumber})");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Component missing from {state.Food?.def?.defName ?? "NULL"} (ID {state.Food.thingIDNumber})");
 
                 return;
             }
@@ -117,32 +119,32 @@ namespace FoodTracker
         }
 
         // Method to check pawn and nutrition for invalid values, and apply nutrition to pawn.
-        public static void ApplyNutritionToPawn(Pawn pawn, float nutrition)
+        public static void ApplyNutritionToPawn(IngestionState state, float nutrition)
         {
-            if (pawn == null || nutrition < 0f)
+            if (state.Pawn == null || nutrition < 0f)
             {
-                Log.Warning($"[FoodTracker] Inputs are not valid. Pawn: {pawn == null} | Nutrition: {nutrition:F4}");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Inputs are not valid. Pawn: {state.Pawn == null} | Nutrition: {nutrition:F4}");
 
                 return;
             }
 
-            if (pawn.needs?.food == null || pawn.records == null || pawn.needs.food.CurLevel < 0f)
+            if (state.Pawn.needs?.food == null || state.Pawn.records == null || state.Pawn.needs.food.CurLevel < 0f)
             {
-                Log.Warning($"[FoodTracker] Cannot apply nutrition to {pawn.LabelShort}. Pawn Needs Null: {pawn.needs?.food == null} " +
-                    $"| Pawn Records Null: {pawn.records == null}| Pawn Needs Level: {pawn.needs.food.CurLevel:F4}");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Cannot apply nutrition to {state.Pawn.LabelShort}. Pawn Needs Null: {state.Pawn.needs?.food == null} " +
+                    $"| Pawn Records Null: {state.Pawn.records == null}| Pawn Needs Level: {state.Pawn.needs.food.CurLevel:F4}");
 
                 return;
             }
             
-            float currentHungerLevel = pawn.needs.food.CurLevel;
-            float maxHungerLevel = pawn.needs.food.MaxLevel; // 1.0 for humans
+            float currentHungerLevel = state.Pawn.needs.food.CurLevel;
+            float maxHungerLevel = state.Pawn.needs.food.MaxLevel; // 1.0 for humans
             float roomInStomach = maxHungerLevel - currentHungerLevel;
 
             float actualNutritionEaten = Mathf.Min(nutrition, roomInStomach);
 
-            pawn.needs.food.CurLevel += actualNutritionEaten;
+            state.Pawn.needs.food.CurLevel += actualNutritionEaten;
 
-            pawn.records.AddTo(RecordDefOf.NutritionEaten, actualNutritionEaten);
+            state.Pawn.records.AddTo(RecordDefOf.NutritionEaten, actualNutritionEaten);
 
         }
     }

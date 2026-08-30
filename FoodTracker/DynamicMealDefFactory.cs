@@ -10,17 +10,17 @@ namespace FoodTracker
     {
         public const string Prefix = "FoodTracker_";
 
-        public static ThingDef CreateTrackerMeal(ThingDef parentDef)
+        public static ThingDef CreateTrackerMeal(IngestionState state)
         {
-            if (parentDef == null)
+            if (state.MealDef == null)
                 return null;
 
             // Make the new tracker def name
-            string newDefName = Prefix + parentDef.defName;
+            string newDefName = Prefix + state.MealDef.defName;
 
             // Already a generated FoodTracker def.
-            if (parentDef.defName.StartsWith(Prefix))
-                return parentDef;
+            if (state.MealDef.defName.StartsWith(Prefix))
+                return state.MealDef;
 
             // Look for the canonical generated def for the ORIGINAL food.
             ThingDef existingDef = DefDatabase<ThingDef>.GetNamedSilentFail(newDefName);
@@ -28,19 +28,19 @@ namespace FoodTracker
                 return existingDef;
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker] ThingDef cloning is underway. {parentDef.defName} has been received, {newDefName} will be created.");
+                Log.Message($"[FoodTracker][T{state.TraceID}] ThingDef cloning is underway. {state.MealDef.defName} has been received, {newDefName} will be created.");
 
             // Clone the ThingDef with all of it's references, fields, data, etc..
-            ThingDef childDef = Gen.MemberwiseClone(parentDef);
+            ThingDef childDef = Gen.MemberwiseClone(state.MealDef);
 
             // Make the partial meal Un-Stackable, set the name, append partial to description
             childDef.defName = newDefName;
             childDef.stackLimit = 1;
-            childDef.description = parentDef.description + " (Partial)";
+            childDef.description = state.MealDef.description + " (Partial)";
 
             // Set the tracking component
-            if (parentDef.comps != null)
-                childDef.comps = new List<CompProperties>(parentDef.comps);
+            if (state.MealDef.comps != null)
+                childDef.comps = new List<CompProperties>(state.MealDef.comps);
             else
                 childDef.comps = new List<CompProperties>();
 
@@ -55,7 +55,7 @@ namespace FoodTracker
             DefDatabase<ThingDef>.Add(childDef);
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker] ThingDef {childDef.defName} has been successfully created.");
+                Log.Message($"[FoodTracker][T{state.TraceID}] ThingDef {childDef.defName} has been successfully created.");
 
             return childDef;
         }

@@ -18,10 +18,10 @@ namespace FoodTracker
             harmony.PatchAll();
 
             // 3. Log Initialization
-            Log.Message($"[FoodTracker] Initialization completed.");
+            Log.Message($"[FoodTracker][T0] Initialization completed.");
 
         }
-
+        public int TraceId { get; set; }
         public static FoodTrackerSettings settings;
 
         public override string SettingsCategory() => "Food Tracker";
@@ -30,7 +30,7 @@ namespace FoodTracker
         {
             Listing_Standard listing = new Listing_Standard();
             listing.Begin(inRect);
-            listing.CheckboxLabeled("Enable Verbose/Developer Logging", ref settings.verboseLogging);
+            listing.CheckboxLabeled("Enable Developer Logging", ref settings.verboseLogging);
             listing.End();
             base.DoSettingsWindowContents(inRect);
         }

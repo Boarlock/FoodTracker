@@ -11,7 +11,7 @@ namespace FoodTracker
             // Validate inputs
             if (state == null || state.Pawn == null || state.MealDef == null)
             {
-                Log.Warning($"[FoodTracker] Inputs are not valid. State Null: {state == null} " +
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Inputs are not valid. State Null: {state == null} " +
                     $"| Pawn Null: {state.Pawn == null} | ThingDef Null: {state.MealDef == null}");
 
                 return;
@@ -27,7 +27,7 @@ namespace FoodTracker
 
             if (map == null || !state.FoodCell.IsValid)
             {
-                Log.Warning($"[FoodTracker] Invalid map or food cell. Map Null: {map == null} | Food Cell Invalid: {!state.FoodCell.IsValid}");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Invalid map or food cell. Map Null: {map == null} | Food Cell Invalid: {!state.FoodCell.IsValid}");
 
                 return;
             }
@@ -55,7 +55,7 @@ namespace FoodTracker
             // If surviving stack cannot be found 
             if (survivingStack == null)
             {
-                Log.Warning($"[FoodTracker] Could not find a surviving {state?.MealDef?.defName ?? "NULL"} (ID {state?.Food?.thingIDNumber ?? 0}) stack at {state.FoodCell}.");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Could not find a surviving {state?.MealDef?.defName ?? "NULL"} (ID {state?.Food?.thingIDNumber ?? 0}) stack at {state.FoodCell}.");
 
                 return;
             }
@@ -72,7 +72,7 @@ namespace FoodTracker
 
             if (partialMeal == null)
             {
-                Log.Warning($"[FoodTracker] Failed to make {partialMeal?.def.defName ?? "NULL"} (ID {partialMeal?.thingIDNumber ?? 0})");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Failed to make {partialMeal?.def.defName ?? "NULL"} (ID {partialMeal?.thingIDNumber ?? 0})");
 
                 itemsToRemove--;
 
@@ -82,13 +82,13 @@ namespace FoodTracker
                     survivingStack.stackCount -= itemsToRemove;
 
                 // Give the pawn and its records exactly the amount removed from the food.
-                FoodTrackingHelpers.ApplyNutritionToPawn(state.Pawn, (wholeItemsEaten * state.NutritionPerItem));
+                FoodTrackingHelpers.ApplyNutritionToPawn(state, (wholeItemsEaten * state.NutritionPerItem));
 
                 return;
             }
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker] Eating interrupted: {state.MealDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
+                Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.MealDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
                     $"Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
                     $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} | Total Remaining: {(state.TotalNutrition - nutritionEaten):F2} " +
                     $"| Partial Meal: {partialMeal.def.defName} (ID {partialMeal.thingIDNumber}) | Partial Nutrition: {partialMealNutrition:F2} " +
@@ -102,7 +102,7 @@ namespace FoodTracker
                 survivingStack.stackCount -= itemsToRemove;
 
             // Give the pawn and its records exactly the amount removed from the food.
-            FoodTrackingHelpers.ApplyNutritionToPawn(state.Pawn, nutritionEaten);
+            FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
 
         }
 
@@ -110,7 +110,7 @@ namespace FoodTracker
         {
             if (state == null || state.Pawn == null || state.MealDef == null)
             {
-                Log.Warning($"[FoodTracker] Inputs are not valid. State Null: {state == null} " +
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Inputs are not valid. State Null: {state == null} " +
                     $"| Pawn Null: {state.Pawn == null} | ThingDef Null: {state.MealDef == null}");
 
                 return;
@@ -130,7 +130,7 @@ namespace FoodTracker
 
             if (map == null || !state.FoodCell.IsValid)
             {
-                Log.Warning($"[FoodTracker] Invalid map or food cell. Map Null: {map == null} | Food Cell Invalid: {!state.FoodCell.IsValid}");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Invalid map or food cell. Map Null: {map == null} | Food Cell Invalid: {!state.FoodCell.IsValid}");
 
                 return;
             }
@@ -158,7 +158,7 @@ namespace FoodTracker
             // If surviving stack cannot be found 
             if (survivingStack == null)
             {
-                Log.Warning($"[FoodTracker] Could not find a surviving {state?.MealDef?.defName ?? "NULL"} (ID {state?.Food?.thingIDNumber ?? 0}) stack at {state.FoodCell}.");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Could not find a surviving {state?.MealDef?.defName ?? "NULL"} (ID {state?.Food?.thingIDNumber ?? 0}) stack at {state.FoodCell}.");
 
                 return;
             }
@@ -168,7 +168,7 @@ namespace FoodTracker
             float nutritionOnStackEaten = itemsToRemove * state.NutritionPerItem;
 
             // Give the pawn and its records exactly the amount removed from the food.
-            FoodTrackingHelpers.ApplyNutritionToPawn(state.Pawn, nutritionOnStackEaten);
+            FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionOnStackEaten);
 
             if (itemsToRemove >= survivingStack.stackCount)
                 survivingStack.Destroy(DestroyMode.Vanish);
@@ -176,7 +176,7 @@ namespace FoodTracker
                 survivingStack.stackCount -= itemsToRemove;
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker] Eating interrupted: {state.MealDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
+                Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.MealDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
                     $"Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
                     $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} " +
                     $"| Total Remaining: {(state.NutritionPerItem * (state.IngestCount - wholeItemsEaten)):F2} " +

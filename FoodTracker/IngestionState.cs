@@ -7,6 +7,9 @@ namespace FoodTracker
     // Snapshot of ingestion job 
     public class IngestionState
     {
+        // Internal ID to track each ingestion.
+        public int TraceID;
+
         // Captured during Prefix while the Food Thing is still reliable.
         public Thing Food;
         public ThingDef MealDef;
