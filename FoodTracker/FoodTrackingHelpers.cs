@@ -55,16 +55,16 @@ namespace FoodTracker
         }
 
         // Determines if the target food is a batch food item that should not be subdivided into partials.
-        public static bool IsBatchFood(IngestionState state)
+        public static bool IsBatchFood(ThingDef foodDef)
         {
-            if (state.BaseDef == null)
+            if (foodDef == null)
             {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Input is not valid. ThingDef Null: {state.BaseDef == null}");
+                Log.Warning($"[FoodTracker] Input is not valid. ThingDef Null: {foodDef == null}");
 
                 return false;
             }
 
-            float nutrition = state.BaseDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
+            float nutrition = foodDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
 
             return nutrition < MealQualifierThreshold;
         }
@@ -95,14 +95,14 @@ namespace FoodTracker
         {
             if (state.Pawn == null || nutrition < 0f)
             {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Inputs are not valid. Pawn: {state.Pawn == null} | Nutrition: {nutrition:F4}");
+                Log.Warning($"[FoodTracker] Inputs are not valid. Pawn: {state.Pawn == null} | Nutrition: {nutrition:F4}");
 
                 return;
             }
 
             if (state.Pawn.needs?.food == null || state.Pawn.records == null || state.Pawn.needs.food.CurLevel < 0f)
             {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Cannot apply nutrition to {state.Pawn.LabelShort}. Pawn Needs Null: {state.Pawn.needs?.food == null} " +
+                Log.Warning($"[FoodTracker] Cannot apply nutrition to {state.Pawn.LabelShort}. Pawn Needs Null: {state.Pawn.needs?.food == null} " +
                     $"| Pawn Records Null: {state.Pawn.records == null}| Pawn Needs Level: {state.Pawn.needs.food.CurLevel:F4}");
 
                 return;

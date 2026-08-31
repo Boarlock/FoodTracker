@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using RimWorld;
+using System.Diagnostics;
+using UnityEngine;
 using Verse;
 
 namespace FoodTracker
@@ -17,12 +19,17 @@ namespace FoodTracker
                 return;
             }
 
-            // Calculate the actual nutrition eaten based off eating time and nutrition in food at the start, clamped at 0 and nutrition max.
             float nutritionEaten = state.TotalNutrition * state.EatenFraction;
-            float itemsEatenExact = nutritionEaten / state.NutritionPerItem;
-            int wholeItemsEaten = Mathf.FloorToInt(itemsEatenExact);
+            float exactItemsEaten = nutritionEaten / state.NutritionPerItem;
+            int wholeItemsEaten = Mathf.FloorToInt(exactItemsEaten);
+            float nutritionIntoPartial = nutritionEaten - (wholeItemsEaten * state.NutritionPerItem);
+            int itemsRemoved = Mathf.CeilToInt(exactItemsEaten);
 
-            // Get map of pawn which is where destroyedFood resided before destruction
+            // Vanilla restored the food to the stack and no whole batch items were consumed.
+            if (wholeItemsEaten <= 0)
+                return;
+
+            // Get map of pawn which is where destroyedFood resided before destruction.
             Map map = state.Pawn.Map;
 
             if (map == null || !state.FoodCell.IsValid)
@@ -32,10 +39,9 @@ namespace FoodTracker
                 return;
             }
 
-            // Initializing item stack where destroyedFood resided before eating event
+            // Initializing item stack where destroyedFood resided before eating.
             Thing survivingStack = null;
 
-            // Find stack of destroyedFood
             foreach (Thing thing in state.FoodCell.GetThingList(map))
             {
                 if (thing == null || thing.Destroyed)
@@ -52,54 +58,106 @@ namespace FoodTracker
                 break;
             }
 
-            // If surviving stack cannot be found 
             if (survivingStack == null)
             {
                 Log.Warning($"[FoodTracker][T{state.TraceID}] Could not find a surviving {state?.FoodDef?.defName ?? "NULL"} (ID {state?.Food?.thingIDNumber ?? 0}) stack at {state.FoodCell}.");
 
+                float nutritionCorrection = itemsRemoved * state.NutritionPerItem;
+
+                itemsRemoved--;
+
+                if (itemsRemoved >= survivingStack.stackCount)
+                    survivingStack.Destroy(DestroyMode.Vanish);
+                else
+                    survivingStack.stackCount -= itemsRemoved;
+
+                // Give the pawn and its records exactly the amount removed from the food.
+                FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionCorrection);
+
                 return;
             }
 
-            int itemsToRemove = Mathf.Min(Mathf.CeilToInt(itemsEatenExact), survivingStack?.stackCount ?? 0);
+            CompFoodTracker tracker = survivingStack.TryGetComp<CompFoodTracker>();
 
-            // Calculate remaining nutrition to not go below zero.
-            float partialMealEatenFraction = itemsEatenExact - wholeItemsEaten;
-            float partialMealRemainingFraction = 1f - partialMealEatenFraction;
-            float partialMealNutrition = partialMealRemainingFraction * state.NutritionAtStart;
+            if (tracker != null)
+            {
+
+                nutritionEaten = state.TotalNutrition * state.EatenFraction;
+                float nutritionRemainder = nutritionEaten;
+
+                itemsRemoved = 0;
+
+                while (nutritionRemainder > 0f && state.NutritionEntriesBefore.Count > 0)
+                {
+                    float nextItem = state.NutritionEntriesBefore[0];
+
+                    if (nutritionRemainder < nextItem)
+                    {
+                        // The current item was only partially consumed.
+                        state.NutritionEntriesBefore[0] = (nextItem - nutritionRemainder);
+                        break;
+                    }
+
+                    // The entire item at index 0 was consumed.
+                    nutritionRemainder -= nextItem;
+                    state.NutritionEntriesBefore.RemoveAt(0);
+                    itemsRemoved++;
+                }
+
+                tracker.NutritionEntries = state.NutritionEntriesBefore;
+
+                // Remove the consumed physical meals from the stack.
+                if (itemsRemoved >= survivingStack.stackCount)
+                    survivingStack.Destroy(DestroyMode.Vanish);
+                else
+                    survivingStack.stackCount -= itemsRemoved;
+
+                if (FoodTrackerSettings.Verbose)
+                    Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state.Food?.thingIDNumber ?? 0}) " +
+                        $"| Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
+                        $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} | Total Remaining: {(state.TotalNutrition - nutritionEaten):F2} " +
+                        $"| Partial Nutrition: {nutritionIntoPartial} | Whole Items Remaining: {(state.StartingStackCount - itemsRemoved)}");
+
+                // Give the pawn and its records exactly the amount removed from the food.
+                FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
+
+                return;
+            }
 
             // Create the partial meal and drop at specified cell
-            Thing partialMeal = PartialMealFactory.CreateAndDropPartialMeal(state, partialMealNutrition);
+            Thing partialMeal = PartialMealFactory.CreateAndDropPartialMeal(state, nutritionIntoPartial);
 
             if (partialMeal == null)
             {
                 Log.Warning($"[FoodTracker][T{state.TraceID}] Failed to make {partialMeal?.def.defName ?? "NULL"} (ID {partialMeal?.thingIDNumber ?? 0})");
 
-                itemsToRemove--;
+                float nutritionCorrection = itemsRemoved * state.NutritionPerItem;
 
-                if (itemsToRemove >= survivingStack.stackCount)
+                itemsRemoved--;
+
+                if (itemsRemoved >= survivingStack.stackCount)
                     survivingStack.Destroy(DestroyMode.Vanish);
                 else
-                    survivingStack.stackCount -= itemsToRemove;
+                    survivingStack.stackCount -= itemsRemoved;
 
                 // Give the pawn and its records exactly the amount removed from the food.
-                FoodTrackingHelpers.ApplyNutritionToPawn(state, (wholeItemsEaten * state.NutritionPerItem));
+                FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionCorrection);
 
                 return;
             }
+
+            // Remove the consumed physical meals from the stack.
+            if (itemsRemoved >= survivingStack.stackCount)
+                survivingStack.Destroy(DestroyMode.Vanish);
+            else
+                survivingStack.stackCount -= itemsRemoved;
 
             if (FoodTrackerSettings.Verbose)
                 Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
                     $"Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
                     $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} | Total Remaining: {(state.TotalNutrition - nutritionEaten):F2} " +
-                    $"| Partial Meal: {partialMeal.def.defName} (ID {partialMeal.thingIDNumber}) | Partial Nutrition: {partialMealNutrition:F2} " +
+                    $"| Partial Meal: {partialMeal.def.defName} (ID {partialMeal.thingIDNumber}) | Partial Nutrition: {nutritionIntoPartial:F2} " +
                     $"| Whole Items Remaining: {(state.IngestCount - wholeItemsEaten)}");
-
-
-            // Only remove items up to stackCount, if it would leave stackCount at 0 then simply delete the object
-            if (itemsToRemove >= survivingStack.stackCount)
-                survivingStack.Destroy(DestroyMode.Vanish);
-            else
-                survivingStack.stackCount -= itemsToRemove;
 
             // Give the pawn and its records exactly the amount removed from the food.
             FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
@@ -116,10 +174,9 @@ namespace FoodTracker
                 return;
             }
 
-            // Calculate the number of items eaten and nutrition eaten
             float nutritionEaten = state.TotalNutrition * state.EatenFraction;
-            int wholeItemsEaten = Mathf.FloorToInt(nutritionEaten / state.NutritionPerItem);
-
+            float exactItemsEaten = nutritionEaten / state.NutritionPerItem;
+            int wholeItemsEaten = Mathf.FloorToInt(exactItemsEaten);
 
             // Vanilla restored the food to the stack and no whole batch items were consumed.
             if (wholeItemsEaten <= 0)
@@ -163,24 +220,22 @@ namespace FoodTracker
                 return;
             }
 
-            // Only remove items from stack up to max stack size otherwise destroy the Thing
-            int itemsToRemove = Mathf.Min(wholeItemsEaten, survivingStack.stackCount);
-            float nutritionOnStackEaten = itemsToRemove * state.NutritionPerItem;
-
-            // Give the pawn and its records exactly the amount removed from the food.
-            FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionOnStackEaten);
-
-            if (itemsToRemove >= survivingStack.stackCount)
-                survivingStack.Destroy(DestroyMode.Vanish);
-            else
-                survivingStack.stackCount -= itemsToRemove;
+            int itemsRemoved = Mathf.RoundToInt(exactItemsEaten);
+            nutritionEaten = itemsRemoved * state.NutritionPerItem;
 
             if (FoodTrackerSettings.Verbose)
                 Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
                     $"Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
-                    $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} " +
-                    $"| Total Remaining: {(state.NutritionPerItem * (state.IngestCount - wholeItemsEaten)):F2} " +
-                    $"| Whole Items Remaining: {(state.IngestCount - wholeItemsEaten)}");
+                    $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2}");
+
+            if (itemsRemoved >= survivingStack.stackCount)
+                survivingStack.Destroy(DestroyMode.Vanish);
+            else
+                survivingStack.stackCount -= itemsRemoved;
+
+            // Give the pawn and its records exactly the amount removed from the food.
+            FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
+
         }
     }
 }

@@ -79,10 +79,14 @@ namespace FoodTracker
                 if (__state.SourceTracker.NutritionEntries.Count < count)
                     return;
             }
+            int itemsRmoved = __state.SourceStackBefore - __instance.stackCount;
+            // Add as many entries to __result list that changed in source list.
+            for (int i = 0; i < itemsRmoved; i++)
+            {
+                resultTracker.NutritionEntries.Add(__state.SourceTracker.NutritionEntries[0]);
+                __state.SourceTracker.NutritionEntries.RemoveAt(0);
+            }
 
-            // Remove as many entries from the source list, that result recieved.
-            resultTracker.NutritionEntries.AddRange(__state.SourceTracker.NutritionEntries.GetRange(0, count));
-            __state.SourceTracker.NutritionEntries.RemoveRange(0, count);
 
             Log.Message("Splitting off list values into new list.");
 
@@ -177,7 +181,7 @@ namespace FoodTracker
                 Log.Message($"Target List Count: {targetListCount} | Source List Count: {sourceListCount} | " +
                     $"Target List Items: {combinedTarget} | Source List Items {combinedSource}");
 
-                __state.TargetTracker.NutritionEntries.Add(__state.TargetTracker.RemainingNutrition);
+                __state.TargetTracker.NutritionEntries.Insert(0, __state.TargetTracker.RemainingNutrition);
             }
             if (__state.SourceStackBefore == 1 && sourceListCount == 0)
             {
@@ -189,7 +193,7 @@ namespace FoodTracker
                 Log.Message($"Target List Count: {targetListCount} | Source List Count: {sourceListCount} | " +
                     $"Target List Items: {combinedTarget} | Source List Items {combinedSource}");
 
-                __state.SourceTracker.NutritionEntries.Add(__state.SourceTracker.RemainingNutrition);
+                __state.SourceTracker.NutritionEntries.Insert(0, __state.SourceTracker.RemainingNutrition);
             }
 
             // Re-Update lists counts to reflect changes
@@ -201,9 +205,10 @@ namespace FoodTracker
             {
                 Log.Message("Detecting multiple items has transferred.");
 
-                // Remove as many entries from the source list, that target recieved.
-                __state.TargetTracker.NutritionEntries.AddRange(__state.SourceTracker.NutritionEntries.GetRange(0, targetReceived));
-                __state.SourceTracker.NutritionEntries.RemoveRange(0, targetReceived);
+                for (int i = sourceListCountAfterInit - 1; i >= 0; i--)
+                {
+                    __state.TargetTracker.NutritionEntries.Insert(0, __state.SourceTracker.NutritionEntries[i]);
+                }
 
                 string combinedTarget = string.Join(", ", __state.TargetTracker.NutritionEntries);
                 string combinedSource = string.Join(", ", __state.SourceTracker.NutritionEntries);

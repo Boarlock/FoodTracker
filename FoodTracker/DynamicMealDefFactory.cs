@@ -35,7 +35,6 @@ namespace FoodTracker
 
             // Make the partial meal Un-Stackable, set the name, append partial to description
             childDef.defName = newDefName;
-//            childDef.stackLimit = 1;
             childDef.description = state.FoodDef.description + " (Partial)";
 
             // Set the tracking component

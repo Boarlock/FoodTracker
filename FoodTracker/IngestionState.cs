@@ -9,20 +9,20 @@ namespace FoodTracker
     {
         // Internal ID to track each ingestion.
         public int TraceID;
+        public List<float> NutritionEntriesBefore;
 
         // Captured during Prefix while the Food Thing is still reliable.
+        public Pawn Pawn;
         public Thing Food;
         public ThingDef FoodDef;
         public ThingDef BaseDef;
         public ThingDef TrackerDef;
-        public float NutritionAtStart;
-        public float NutritionPerItem;
-        public float TotalNutrition;
         public int StartingStackCount;
         public int IngestCount;
+        public float TotalNutrition;
+        public float NutritionPerItem;
 
         // Captured after vanilla initializes the toil.
-        public Pawn Pawn;
         public int TotalTicks;
         public float HungerAtStart;
         public IntVec3 FoodCell;

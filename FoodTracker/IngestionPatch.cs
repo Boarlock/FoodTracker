@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using RimWorld;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using Verse;
 using Verse.AI;
@@ -17,7 +18,6 @@ namespace FoodTracker
 
         public static void Prefix(Pawn chewer, ref float durationMultiplier, TargetIndex ingestibleInd, ref IngestionState __state)
         {
-
             // Get current job and target food.
             Job curJob = chewer.CurJob;
             Thing food = curJob?.GetTarget(ingestibleInd).Thing;
@@ -26,72 +26,76 @@ namespace FoodTracker
             if (!FoodTrackingHelpers.ValidateFoodEatingAttempt(chewer, food))
                 return;
 
-            // Initialize state with most of it's needed variables
+            int ingestCount = curJob?.count ?? 0;
+
+            CompFoodTracker tracker = food.TryGetComp<CompFoodTracker>();
+
+            float totalNutrition = 0f;
+            float nutritionPerItem = 0f;
+
+            List<float> nutritionEntriesBefore = null;
+
+            // FoodTracker meals use their actual individual tracked nutrition values.
+            if (tracker != null)
+            {
+
+                nutritionEntriesBefore = new List<float>(tracker.NutritionEntries);
+
+                int mealsToConsume = Mathf.Min(ingestCount, tracker.NutritionEntries.Count);
+
+                for (int i = 0; i < mealsToConsume; i++)
+                {
+                    totalNutrition += tracker.NutritionEntries[i];
+                }
+            }
+            else
+            {
+                // Get the non-FT Def and store it in the state with total nutrition.
+                nutritionPerItem = food.GetStatValue(StatDefOf.Nutrition);
+                totalNutrition = ingestCount * nutritionPerItem;
+
+            }
+
+            ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(food.def);
+
+            // Initialize ingestion state.
             __state = new IngestionState
             {
 
                 TraceID = ++nextTraceId,
                 Pawn = chewer,
                 FoodDef = food.def,
+                BaseDef = originalDef,
                 StartingStackCount = food.stackCount,
+                IngestCount = ingestCount,
+                TotalNutrition = totalNutrition,
+                NutritionEntriesBefore = nutritionEntriesBefore
 
             };
 
-            // Get ingest count and total nutrition to be consumed
-            int ingestCount = curJob?.count ?? 0;
-            __state.IngestCount = ingestCount;
-
-            ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(food.def);
-            float nutritionPerItem = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
-            float totalNutrition = ingestCount * nutritionPerItem;
-
-            __state.BaseDef = originalDef;
-            __state.NutritionAtStart = nutritionPerItem;
-            __state.NutritionPerItem = nutritionPerItem;
-            __state.TotalNutrition = totalNutrition;
-
             // Batch foods don't carry a component, this scales eating duration off total nutrition eaten.
-            if (FoodTrackingHelpers.IsBatchFood(__state))
+            if (FoodTrackingHelpers.IsBatchFood(food.def))
             {
-
                 durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
 
                 if (FoodTrackerSettings.Verbose)
                     Log.Message($"[FoodTracker][T{__state.TraceID}] Eating duration: {originalDef.defName} (ID {food.ThingID}) " +
-                        $"| Total Nutrition: {__state.TotalNutrition:F2} | Multiplier: {durationMultiplier:P0}");
+                        $"| Ingest Count: {ingestCount} | Total Nutrition: {__state.TotalNutrition:F2} | Multiplier: {durationMultiplier:P0}");
 
                 return;
             }
 
             ThingDef trackerDef = DynamicMealDefFactory.CreateTrackerMeal(__state);
+
             __state.TrackerDef = trackerDef;
+            __state.NutritionPerItem = nutritionPerItem;
 
-            // If this is not a FoodTracker meal, then it's a full meal. 
-            if (food.TryGetComp<CompFoodTracker>() == null)
-            {
-
-                // Calculate eating duration off total nutrition being consumed.
-                durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
-
-                if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker][T{__state.TraceID}] Eating duration: {originalDef.defName} (ID {food.ThingID}) " +
-                        $"| Total Nutrition: {__state.TotalNutrition:F2} | Multiplier: {durationMultiplier:P0}");
-
-                return;
-            }
-
-            // Get our comp to access nutrition values, set NutritionAtStart to RemainingNutrition.
-            CompFoodTracker tracker = food.TryGetComp<CompFoodTracker>();
-            float nutritionAtStart = tracker.RemainingNutrition;
-            __state.NutritionAtStart = nutritionAtStart;
-            
-
-            // Caclulate eating duration based off nutrition at start.
-            durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / FoodTrackingHelpers.NutritionConsumptionRateMultiplier);
+            // Eating duration is based on the actual total nutrition being consumed.
+            durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
 
             if (FoodTrackerSettings.Verbose)
                 Log.Message($"[FoodTracker][T{__state.TraceID}] Eating duration: {originalDef.defName} (ID {food.ThingID}) " +
-                    $"| Available Nutrition: {__state.TotalNutrition:F2} | Multiplier: {durationMultiplier:P0}");
+                    $"| Ingest Count: {ingestCount} | Total Nutrition: {__state.TotalNutrition:F2} | Multiplier: {durationMultiplier:P0}");
 
         }
 
@@ -147,16 +151,14 @@ namespace FoodTracker
                 if (FoodTrackerSettings.Verbose && food.TryGetComp<CompFoodTracker>() == null)
                 {
                     Log.Message($"[FoodTracker][T{state.TraceID}] Eating started: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
-                        $"| Pawn: {state.Pawn} | Ingest Count: {state.IngestCount} | Nutrition Per Item: {state.NutritionPerItem:F2}" +
-                        $"| Total Nutrition: {state.TotalNutrition:F2}");
+                        $"| Pawn: {state.Pawn} | Ingest Count: {state.IngestCount} | Total Nutrition: {state.TotalNutrition:F2}");
 
                     return;
                 }
 
                 if (FoodTrackerSettings.Verbose)
                     Log.Message($"[FoodTracker][T{state.TraceID}] Eating started: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
-                        $"| Pawn: {state.Pawn} | Ingest Count: {state.IngestCount} | Nutrition Per Item: {state.NutritionPerItem:F2}" +
-                        $"| Available Nutrition: {state.TotalNutrition:F2}");
+                        $"| Pawn: {state.Pawn} | Ingest Count: {state.IngestCount} | Available Nutrition: {state.TotalNutrition:F2}");
             };
 
             toil.AddFinishAction(() =>
@@ -215,9 +217,9 @@ namespace FoodTracker
 
             // Calculate correction based off how mnuch nutrition should be applied, and how mucn was applied.
             float vanillaNutritionAdded = state.Pawn.needs.food.CurLevel - state.HungerAtStart;
-            float correction = state.NutritionAtStart - vanillaNutritionAdded;
-            float trueNutritionConsumed = vanillaNutritionAdded + correction;
-            
+            float trueNutritionConsumed = state.TotalNutrition;
+            float correction = trueNutritionConsumed - vanillaNutritionAdded;
+
             FoodTrackingHelpers.ApplyNutritionToPawn(state, correction);
 
             if (FoodTrackerSettings.Verbose)
