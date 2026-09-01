@@ -101,6 +101,12 @@ namespace FoodTracker
                     tracker.PartialNutrition = state.NutritionEntriesBefore[0];
                     tracker.NutritionEntries.Clear();
                 }
+                else if (state.IngestCount == 1)
+                {
+                    // Also.. Singleton FT meal.
+                    tracker.PartialNutrition = state.NutritionEntriesBefore[0];
+                    tracker.NutritionEntries.Clear();
+                }
                 else
                 {
                     // Stack FT meal. Clear the singleton and restore the nutrition entries.

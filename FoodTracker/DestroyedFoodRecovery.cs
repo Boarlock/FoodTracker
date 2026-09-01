@@ -25,10 +25,6 @@ namespace FoodTracker
             float nutritionIntoPartial = state.TotalNutrition - nutritionEaten;
             int itemsRemoved = Mathf.CeilToInt(exactItemsEaten);
 
-            // Vanilla restored the food to the stack and no whole batch items were consumed.
-            if (wholeItemsEaten <= 0.004f)
-                return;
-
             // Get map of pawn which is where destroyedFood resided before destruction.
             Map map = state.Pawn.Map;
 
@@ -199,6 +195,12 @@ namespace FoodTracker
             else if (state.NutritionEntriesBefore.Count == 1)
             {
                 // Singleton FT meal.
+                tracker.PartialNutrition = state.NutritionEntriesBefore[0];
+                tracker.NutritionEntries.Clear();
+            }
+            else if (state.IngestCount == 1)
+            {
+                // Also.. Singleton FT meal.
                 tracker.PartialNutrition = state.NutritionEntriesBefore[0];
                 tracker.NutritionEntries.Clear();
             }
