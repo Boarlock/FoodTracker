@@ -104,7 +104,7 @@ namespace FoodTracker
                 return;
             }
 
-            ThingDef trackerDef = DynamicMealDefFactory.CreateTrackerMeal(__state);
+            ThingDef trackerDef = DynamicMealDefFactory.CreateTrackerMeal(food.def);
 
             __state.TrackerDef = trackerDef;
             __state.NutritionPerItem = nutritionPerItem;

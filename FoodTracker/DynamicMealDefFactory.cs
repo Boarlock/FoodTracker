@@ -9,76 +9,76 @@ namespace FoodTracker
     {
         public const string Prefix = "FoodTracker_";
 
-        public static ThingDef CreateTrackerMeal(IngestionState state)
+        public static ThingDef CreateTrackerMeal(ThingDef mealDef, bool loadingFromSave = false)
         {
-            if (state.FoodDef == null)
+            if (mealDef == null)
                 return null;
 
-            // Make the new tracker def name
-            string newDefName = Prefix + state.FoodDef.defName;
+            string newDefName = Prefix + mealDef.defName;
 
             // Already a generated FoodTracker def.
-            if (state.FoodDef.defName.StartsWith(Prefix))
-                return state.FoodDef;
+            if (mealDef.defName.StartsWith(Prefix))
+                return mealDef;
 
-            // Look for the canonical generated def for the ORIGINAL food.
+            // Already exists.
             ThingDef existingDef = DefDatabase<ThingDef>.GetNamedSilentFail(newDefName);
+
             if (existingDef != null)
                 return existingDef;
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{state.TraceID}] ThingDef cloning is underway. {state.FoodDef.defName} has been received, {newDefName} will be created.");
+                Log.Message($"[FoodTracker] ThingDef cloning is underway. {mealDef.defName} has been received, {newDefName} will be created.");
 
-            // Clone the ThingDef with all of it's references, fields, data, etc..
-            ThingDef childDef = Gen.MemberwiseClone(state.FoodDef);
+            ThingDef childDef = Gen.MemberwiseClone(mealDef);
 
-            // Make the partial meal Un-Stackable, set the name, append partial to description
             childDef.defName = newDefName;
-            childDef.description = state.FoodDef.description + " (Partial)";
-            childDef.label = state.FoodDef.label + " (Partial)";
+            childDef.description = mealDef.description + " (Partial)";
+            childDef.label = mealDef.label + " (Partial)";
 
-            // Set the tracking component
-            if (state.FoodDef.comps != null)
-                childDef.comps = new List<CompProperties>(state.FoodDef.comps);
+            if (mealDef.comps != null)
+                childDef.comps = new List<CompProperties>(mealDef.comps);
             else
                 childDef.comps = new List<CompProperties>();
 
             childDef.comps.Add(new CompProperties_FoodTracker());
 
-            RegisterGeneratedThingDef(childDef);
+            RegisterGeneratedThingDef(childDef, loadingFromSave);
+
+            // Do not touch the GameComponent while it is currently
+            // being loaded from the save.
+            if (!loadingFromSave)
+            {
+                FoodTrackerGameComponent component = Current.Game.GetComponent<FoodTrackerGameComponent>();
+
+                if (!component.GeneratedDefNames.Contains(childDef.defName))
+                    component.GeneratedDefNames.Add(childDef.defName);
+            }
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{state.TraceID}] ThingDef {childDef.defName} has been successfully created.");
+                Log.Message($"[FoodTracker] ThingDef {childDef.defName} has been successfully created.");
 
             return childDef;
         }
 
-        private static void RegisterGeneratedThingDef(ThingDef childDef)
+        private static void RegisterGeneratedThingDef(ThingDef childDef, bool loadingFromSave)
         {
-
-            // A new Def needs its own hash.
             childDef.shortHash = 0;
             childDef.ResolveDefNameHash();
             childDef.ResolveReferences();
             childDef.generated = true;
 
-            // Add the new FoodTracker Def to the Database
             DefDatabase<ThingDef>.Add(childDef);
 
-            // Register the new ThingDef with its ThingCategoryDefs
             foreach (ThingCategoryDef category in childDef.thingCategories)
             {
                 if (!category.childThingDefs.Contains(childDef))
-                {
-                    category.childThingDefs.Add(childDef);
-                }
+                category.childThingDefs.Add(childDef);
 
-                // Rebuild the category's cached ThingDef lists
                 category.ResolveReferences();
             }
 
-            // Because meals are counted as resources we need to update resource center with our new ThingDef
-            ResourceCounter.ResetDefs();
+            if (!loadingFromSave)
+                ResourceCounter.ResetDefs();
         }
     }
 }

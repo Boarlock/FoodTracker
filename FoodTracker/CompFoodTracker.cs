@@ -38,23 +38,30 @@ namespace FoodTracker
             }
         }
 
-
         public override void PostSpawnSetup(bool respawningAfterLoad)
         {
             base.PostSpawnSetup(respawningAfterLoad);
 
+            if (respawningAfterLoad )
+                return;
+
+            if (FoodTrackerStackOperations.MergeInProgress || FoodTrackerStackOperations.SplitInProgress)
+                return;
+
             if (parent.stackCount <= 0)
                 return;
 
-            ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(parent.def);
-            float nutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
+            ThingDef originalDef =
+                FoodTrackingHelpers.GetOriginalMealDef(parent.def);
+
+            float nutrition =
+                originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
 
             // SINGLETON STATE
             if (parent.stackCount == 1)
             {
                 nutritionEntries.Clear();
 
-                // Only initialize the singleton nutrition if it has not already been initialized.
                 if (nutritionThisMeal < 0f)
                 {
                     nutritionThisMeal = nutrition;
@@ -66,7 +73,7 @@ namespace FoodTracker
             // STACK STATE
             nutritionThisMeal = -1f;
 
-            // If we already have the correct number of entries, leave the existing nutrition values alone.
+            // Existing per-item nutrition is already valid.
             if (nutritionEntries.Count == parent.stackCount)
                 return;
 
@@ -78,6 +85,46 @@ namespace FoodTracker
                 nutritionEntries.Add(nutrition);
             }
         }
+
+        /*        public override void PostSpawnSetup(bool respawningAfterLoad)
+                {
+                    base.PostSpawnSetup(respawningAfterLoad);
+
+                    if (parent.stackCount <= 0)
+                        return;
+
+                    ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(parent.def);
+                    float nutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
+
+                    // SINGLETON STATE
+                    if (parent.stackCount == 1)
+                    {
+                        nutritionEntries.Clear();
+
+                        // Only initialize the singleton nutrition if it has not already been initialized.
+                        if (nutritionThisMeal < 0f)
+                        {
+                            nutritionThisMeal = nutrition;
+                        }
+
+                        return;
+                    }
+
+                    // STACK STATE
+                    nutritionThisMeal = -1f;
+
+                    // If we already have the correct number of entries, leave the existing nutrition values alone.
+                    if (nutritionEntries.Count == parent.stackCount)
+                        return;
+
+                    // Otherwise initialize the stack.
+                    nutritionEntries.Clear();
+
+                    for (int i = 0; i < parent.stackCount; i++)
+                    {
+                        nutritionEntries.Add(nutrition);
+                    }
+                }*/
 
 
         public override void PostExposeData()

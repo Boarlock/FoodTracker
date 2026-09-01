@@ -19,7 +19,7 @@ namespace FoodTracker
             }
 
             // Get the partial meal definition corresponding to the vanilla meal. If no partial meal definition is found it returns.
-            ThingDef partialDef = DynamicMealDefFactory.CreateTrackerMeal(state);
+            ThingDef partialDef = DynamicMealDefFactory.CreateTrackerMeal(state.FoodDef);
 
             if (partialDef == null)
             {

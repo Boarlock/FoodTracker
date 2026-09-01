@@ -5,6 +5,11 @@ using Verse;
 
 namespace FoodTracker
 {
+    public static class FoodTrackerStackOperations
+    {
+        public static bool MergeInProgress;
+        public static bool SplitInProgress;
+    }
 
     public class SplitOffState
     {
@@ -46,138 +51,148 @@ namespace FoodTracker
             if (__state == null || __result == null)
                 return;
 
-            // We get the FT component for both the source stack and the resulting stack after the split.
-            CompFoodTracker sourceTracker = __state.SourceTracker;
-            CompFoodTracker resultTracker = __result.TryGetComp<CompFoodTracker>();
+            FoodTrackerStackOperations.SplitInProgress = true;
 
-            if (sourceTracker == null || resultTracker == null)
-                return;
-
-            // Vanilla should have reduced the original stack by exactly the amount that was split off.
-            if (__instance.stackCount != __state.SourceStackBefore - count)
-                return;
-
-            // We should only be handling an actual split
-            if (__result == __instance)
-                return;
-
-            // Setting target to singleton mode.
-            if (__result.stackCount == 1)
+            try
             {
 
-                resultTracker.PartialNutrition = sourceTracker.NutritionEntries[0];
+                // We get the FT component for both the source stack and the resulting stack after the split.
+                CompFoodTracker sourceTracker = __state.SourceTracker;
+                CompFoodTracker resultTracker = __result.TryGetComp<CompFoodTracker>();
 
-                resultTracker.NutritionEntries.Clear();
+                if (sourceTracker == null || resultTracker == null)
+                    return;
 
-                sourceTracker.NutritionEntries.RemoveAt(0);
+                // Vanilla should have reduced the original stack by exactly the amount that was split off.
+                if (__instance.stackCount != __state.SourceStackBefore - count)
+                    return;
 
-            }
-            else
-            {
+                // We should only be handling an actual split
+                if (__result == __instance)
+                    return;
 
-                // Add as many entries to __result list that changed in source list.
-                for (int i = 0; i < count; i++)
+                // Setting target to singleton mode.
+                if (__result.stackCount == 1)
                 {
-                    resultTracker.NutritionEntries.Add(sourceTracker.NutritionEntries[0]);
 
-                    sourceTracker.NutritionEntries.RemoveAt(0);
-                }
+                    resultTracker.PartialNutrition = sourceTracker.NutritionEntries[0];
 
-                resultTracker.PartialNutrition = -1f;
-
-            }
-
-            // Setting source to singleton mode.
-            if (__instance.stackCount == 1)
-            {
-
-                sourceTracker.PartialNutrition = sourceTracker.NutritionEntries[0];
-
-                sourceTracker.NutritionEntries.Clear();
-
-            }
-
-            int tListCount = resultTracker.NutritionEntries.Count;
-            int sListCount = resultTracker.NutritionEntries.Count;
-
-            string combinedTarget = string.Join(", ", resultTracker.NutritionEntries);
-            string combinedSource = string.Join(", ", __state.SourceTracker.NutritionEntries);
-
-            Log.Message(
-                $"[FoodTracker][SPLIT] " +
-                $"Target Stack={__result.stackCount} " +
-                $"Target Partial={resultTracker.PartialNutrition} " +
-                $"Target List Count={tListCount} " +
-                $"Target List=[{combinedTarget}] | " +
-                $"Source Stack={__instance.stackCount} " +
-                $"Source Partial={sourceTracker.PartialNutrition} " +
-                $"Source List Count={sourceTracker.NutritionEntries.Count} " +
-                $"Source List=[{combinedSource}] | " +
-                $"Items Moved={count} | " +
-                $"Source Before={__state.SourceStackBefore}");
-
-            // Validation
-            if (__result.stackCount != tListCount)
-            {
-                if (__result.stackCount == 1 && resultTracker.PartialNutrition > 0)
-                {
                     resultTracker.NutritionEntries.Clear();
 
-                    return;
-                }
-                int diff = __result.stackCount - tListCount;
-                if (diff > 0)
-                {
-                    Log.Warning($"SplitOff() Discrepency Reported. Target stack count is less than list count. " +
-                        $"Stack Count: {__result.stackCount} | List Count: {tListCount}");
+                    sourceTracker.NutritionEntries.RemoveAt(0);
 
-                    for (int i = 0; i < diff; i++)
-                    {
-                        __result.stackCount--;
-                    }
                 }
                 else
                 {
-                    Log.Warning($"SplitOff() Discrepency Reported. Target stack count is more than list count. " +
-                        $"Stack Count: {__result.stackCount} | List Count: {tListCount}");
 
-                    for (int i = 0; i < -diff; i++)
+                    // Add as many entries to __result list that changed in source list.
+                    for (int i = 0; i < count; i++)
                     {
-                        resultTracker.NutritionEntries.RemoveAt(0);
+                        resultTracker.NutritionEntries.Add(sourceTracker.NutritionEntries[0]);
+
+                        sourceTracker.NutritionEntries.RemoveAt(0);
                     }
+
+                    resultTracker.PartialNutrition = -1f;
+
                 }
 
-            }
-
-            if (__instance.stackCount != sListCount)
-            {
-                if (__instance.stackCount == 0 || (__instance.stackCount == 1 && sourceTracker.PartialNutrition > 0))
+                // Setting source to singleton mode.
+                if (__instance.stackCount == 1)
                 {
+
+                    sourceTracker.PartialNutrition = sourceTracker.NutritionEntries[0];
+
                     sourceTracker.NutritionEntries.Clear();
 
-                    return;
                 }
-                int diff = __instance.stackCount - sListCount;
-                if (diff > 0)
-                {
-                    Log.Warning($"SplitOff() Discrepency Reported. Source stack count is less than list count. " +
-                        $"Stack Count: {__instance.stackCount} | List Count: {sListCount}");
 
-                    for (int i = 0; i < diff; i++)
+                int tListCount = resultTracker.NutritionEntries.Count;
+                int sListCount = resultTracker.NutritionEntries.Count;
+
+                string combinedTarget = string.Join(", ", resultTracker.NutritionEntries);
+                string combinedSource = string.Join(", ", __state.SourceTracker.NutritionEntries);
+
+                Log.Message(
+                    $"[FoodTracker][SPLIT] " +
+                    $"Target Stack={__result.stackCount} " +
+                    $"Target Partial={resultTracker.PartialNutrition} " +
+                    $"Target List Count={tListCount} " +
+                    $"Target List=[{combinedTarget}] | " +
+                    $"Source Stack={__instance.stackCount} " +
+                    $"Source Partial={sourceTracker.PartialNutrition} " +
+                    $"Source List Count={sourceTracker.NutritionEntries.Count} " +
+                    $"Source List=[{combinedSource}] | " +
+                    $"Items Moved={count} | " +
+                    $"Source Before={__state.SourceStackBefore}");
+
+                // Validation
+                if (__result.stackCount != tListCount)
+                {
+                    if (__result.stackCount == 1 && resultTracker.PartialNutrition > 0)
                     {
-                        __instance.stackCount--;
+                        resultTracker.NutritionEntries.Clear();
+
+                        return;
+                    }
+                    int diff = __result.stackCount - tListCount;
+                    if (diff > 0)
+                    {
+                        Log.Warning($"SplitOff() Discrepency Reported. Target stack count is less than list count. " +
+                            $"Stack Count: {__result.stackCount} | List Count: {tListCount}");
+
+                        for (int i = 0; i < diff; i++)
+                        {
+                            __result.stackCount--;
+                        }
+                    }
+                    else
+                    {
+                        Log.Warning($"SplitOff() Discrepency Reported. Target stack count is more than list count. " +
+                            $"Stack Count: {__result.stackCount} | List Count: {tListCount}");
+
+                        for (int i = 0; i < -diff; i++)
+                        {
+                            resultTracker.NutritionEntries.RemoveAt(0);
+                        }
+                    }
+
+                }
+
+                if (__instance.stackCount != sListCount)
+                {
+                    if (__instance.stackCount == 0 || (__instance.stackCount == 1 && sourceTracker.PartialNutrition > 0))
+                    {
+                        sourceTracker.NutritionEntries.Clear();
+
+                        return;
+                    }
+                    int diff = __instance.stackCount - sListCount;
+                    if (diff > 0)
+                    {
+                        Log.Warning($"SplitOff() Discrepency Reported. Source stack count is less than list count. " +
+                            $"Stack Count: {__instance.stackCount} | List Count: {sListCount}");
+
+                        for (int i = 0; i < diff; i++)
+                        {
+                            __instance.stackCount--;
+                        }
+                    }
+                    else
+                    {
+                        Log.Warning($"SplitOff() Discrepency Reported. Source stack count is more than list count. " +
+                            $"Stack Count: {__instance.stackCount} | List Count: {sListCount}");
+
+                        for (int i = 0; i < -diff; i++)
+                        {
+                            resultTracker.NutritionEntries.RemoveAt(0);
+                        }
                     }
                 }
-                else
-                {
-                    Log.Warning($"SplitOff() Discrepency Reported. Source stack count is more than list count. " +
-                        $"Stack Count: {__instance.stackCount} | List Count: {sListCount}");
-
-                    for (int i = 0; i < -diff; i++)
-                    {
-                        resultTracker.NutritionEntries.RemoveAt(0);
-                    }
-                }
+            }
+            finally
+            {
+                FoodTrackerStackOperations.SplitInProgress = false;
             }
         }
     }
@@ -202,6 +217,9 @@ namespace FoodTracker
             if (__instance == null || other == null)
                 return;
 
+            if (FoodTrackerStackOperations.MergeInProgress)
+                return;
+
             CompFoodTracker targetTracker = __instance.TryGetComp<CompFoodTracker>();
             CompFoodTracker sourceTracker = other.TryGetComp<CompFoodTracker>();
 
@@ -214,8 +232,11 @@ namespace FoodTracker
                 SourceTracker = sourceTracker,
 
                 TargetStackBefore = __instance.stackCount,
-                SourceStackBefore = other.stackCount
+                SourceStackBefore = other.stackCount,
             };
+
+            FoodTrackerStackOperations.MergeInProgress = true;
+
         }
         public static void Postfix(Thing __instance, Thing other, bool respectStackLimit, StackMergeState __state)
         {
@@ -225,116 +246,150 @@ namespace FoodTracker
             if (__state.TargetTracker == null || __state.SourceTracker == null)
                 return;
 
-            int targetStackAfter = __instance.stackCount;
-            int sourceStackAfter = other.stackCount;
-            int diff = Math.Abs(targetStackAfter - __state.TargetStackBefore);
-
-            // In case the vanilla method fired but no merger happened, we don't want to do anything.
-            if (__state.TargetStackBefore == targetStackAfter && __state.SourceStackBefore == sourceStackAfter)
-                return;
-
-            // Bootstrap any uninitialized singleton FT meals. This mirrors CompFoodTracker.PostSpawnSetup initialization.
-            if (__state.TargetTracker.NutritionEntries.Count == 0 && __state.TargetTracker.PartialNutrition < 0f)
+            try
             {
-                ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(__instance.def);
-                __state.TargetTracker.PartialNutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
-            }
-            else if
-                (__state.SourceTracker.NutritionEntries.Count == 0 && __state.SourceTracker.PartialNutrition < 0f)
-            {
-                ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(other.def);
-                __state.SourceTracker.PartialNutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
-            }
+                int targetStackAfter = __instance.stackCount;
+                int sourceStackAfter = other.stackCount;
+                int diff = Math.Abs(targetStackAfter - __state.TargetStackBefore);
 
-            // Singleton merge case: If either stack was a singleton, we need to add
-            // the PartialNutrition values to the NutritionEntries list of the resulting stack.
-            if ((targetStackAfter == 2 && sourceStackAfter == 0) || (sourceStackAfter == 2 && targetStackAfter == 0))
-            {
+                // In case the vanilla method fired but no merger happened, we don't want to do anything.
+                if (__state.TargetStackBefore == targetStackAfter && __state.SourceStackBefore == sourceStackAfter)
+                    return;
 
-                Log.Message($"[FoodTracker][MERGE] Singleton merge detected. Target stack before: {__state.TargetStackBefore}, Source stack before: {__state.SourceStackBefore}, " +
-                    $"Target stack after: {targetStackAfter}, Source stack after: {sourceStackAfter}, Target List Count: {__state.TargetTracker.NutritionEntries.Count}" +
-                    $"Source List Count: {__state.SourceTracker.NutritionEntries.Count}");
-
-                if (targetStackAfter == 2)
+                // Bootstrap any uninitialized singleton FT meals. This mirrors CompFoodTracker.PostSpawnSetup initialization.
+                if (__state.TargetTracker.NutritionEntries.Count == 0 && __state.TargetTracker.PartialNutrition < 0f)
                 {
-                    __state.TargetTracker.NutritionEntries.Insert(0, __state.TargetTracker.PartialNutrition);
-                    __state.TargetTracker.NutritionEntries.Insert(0, __state.SourceTracker.PartialNutrition);
+                    ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(__instance.def);
+                    __state.TargetTracker.PartialNutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
                 }
-                else
+                else if
+                    (__state.SourceTracker.NutritionEntries.Count == 0 && __state.SourceTracker.PartialNutrition < 0f)
                 {
-                    __state.SourceTracker.NutritionEntries.Insert(0, __state.SourceTracker.PartialNutrition);
-                    __state.SourceTracker.NutritionEntries.Insert(0, __state.TargetTracker.PartialNutrition);
+                    ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(other.def);
+                    __state.SourceTracker.PartialNutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
                 }
-                // Vanilla should've destroyed the other stack so we do not need to clear its list or reset its PartialNutrition.
 
-                return;
-
-            }
-
-            // Append singleton merge case: If one stack was a singleton and the other stack had more than one item,
-            // we need to add the PartialNutrition value of the singleton to the NutritionEntries list of the resulting stack.
-            if ((__state.TargetStackBefore > 1 && __state.SourceStackBefore == 1) || (__state.SourceStackBefore > 1 && __state.TargetStackBefore == 1))
-            {
-
-                Log.Message($"[FoodTracker][MERGE] Append singleton merge detected. Target stack before: {__state.TargetStackBefore}, Source stack before: {__state.SourceStackBefore}, " +
-                    $"Target stack after: {targetStackAfter}, Source stack after: {sourceStackAfter}, Target List Count: {__state.TargetTracker.NutritionEntries.Count}" +
-                    $"Source List Count: {__state.SourceTracker.NutritionEntries.Count}");
-
-                if (__state.TargetStackBefore == 1 && targetStackAfter == 0)
+                // Singleton merge case: If either stack was a singleton, we need to add
+                // the PartialNutrition values to the NutritionEntries list of the resulting stack.
+                if ((targetStackAfter == 2 && sourceStackAfter == 0) || (sourceStackAfter == 2 && targetStackAfter == 0))
                 {
-                    __state.SourceTracker.NutritionEntries.Insert(0, __state.TargetTracker.PartialNutrition);
-                }
-                else
-                {
-                    __state.TargetTracker.NutritionEntries.Insert(0, __state.SourceTracker.PartialNutrition);
-                }
-                // Vanilla should've destroyed the other stack so we do not need to clear its list or reset its PartialNutrition.
 
-                return;
-
-            }
-
-            // Stack merge case: If both stacks had more than one item, we need to append the NutritionEntries lists both ways..
-            if (__state.TargetStackBefore > 1 && __state.SourceStackBefore > 1)
-            {
-                if (diff > 0)
-                {
-                    Log.Message($"[FoodTracker][MERGE] Stack merge detected. Target stack before: {__state.TargetStackBefore}, Source stack before: {__state.SourceStackBefore}, " +
-                        $"Target stack after: {targetStackAfter}, Source stack after: {sourceStackAfter}, Target List Count: {__state.TargetTracker.NutritionEntries.Count}" +
-                        $"Source List Count: {__state.SourceTracker.NutritionEntries.Count}");
-
-                    while (diff > 0 && __state.SourceTracker.NutritionEntries.Count > 0)
+                    if (targetStackAfter == 2)
                     {
-                        __state.TargetTracker.NutritionEntries.Insert(0, __state.SourceTracker.NutritionEntries[0]);
-                        __state.SourceTracker.NutritionEntries.RemoveAt(0);
-                        diff--;
+                        __state.TargetTracker.NutritionEntries.Insert(0, __state.TargetTracker.PartialNutrition);
+                        __state.TargetTracker.NutritionEntries.Insert(0, __state.SourceTracker.PartialNutrition);
+
+                        Log.Message($"[FoodTracker][MERGE] Singleton merge detected, Target has absorbed Source. Target stack before: {__state.TargetStackBefore}, " +
+                            $"Source stack before: {__state.SourceStackBefore}, Target stack after: {targetStackAfter}, Source stack after: {sourceStackAfter}, " +
+                            $"Target List Count: {__state.TargetTracker.NutritionEntries.Count}, Source List Count: {__state.SourceTracker.NutritionEntries.Count}, " +
+                            $"Target Singleton State: {__state.TargetTracker.PartialNutrition}, Source Singleton State: {__state.SourceTracker.PartialNutrition}");
                     }
-                    // We need to check for singleton conversion after the merge. If the target stack is now a singleton,
-                    // we need to set its PartialNutrition value and clear its NutritionEntries list.
-                    if (__state.SourceTracker.NutritionEntries.Count == 1)
+                    else
                     {
-                        __state.SourceTracker.PartialNutrition = __state.SourceTracker.NutritionEntries[0];
-                        __state.SourceTracker.NutritionEntries.Clear();
+                        __state.SourceTracker.NutritionEntries.Insert(0, __state.SourceTracker.PartialNutrition);
+                        __state.SourceTracker.NutritionEntries.Insert(0, __state.TargetTracker.PartialNutrition);
+
+                        Log.Message($"[FoodTracker][MERGE] Singleton merge detected, Source has absorbed Target. Target stack before: {__state.TargetStackBefore}, " +
+                            $"Source stack before: {__state.SourceStackBefore}, Target stack after: {targetStackAfter}, Source stack after: {sourceStackAfter}, " +
+                            $"Target List Count: {__state.TargetTracker.NutritionEntries.Count}, Source List Count: {__state.SourceTracker.NutritionEntries.Count}, " +
+                            $"Target Singleton State: {__state.TargetTracker.PartialNutrition}, Source Singleton State: {__state.SourceTracker.PartialNutrition}");
                     }
+                    // Vanilla should've destroyed the other stack so we do not need to clear its list or reset its PartialNutrition.
+
+                    return;
+
                 }
-                else
+
+                // Append singleton merge case: If one stack was a singleton and the other stack had more than one item,
+                // we need to add the PartialNutrition value of the singleton to the NutritionEntries list of the resulting stack.
+                if ((__state.TargetStackBefore > 1 && __state.SourceStackBefore == 1) || (__state.SourceStackBefore > 1 && __state.TargetStackBefore == 1))
                 {
-                    while (diff > 0 && __state.TargetTracker.NutritionEntries.Count > 0)
+
+                    if (__state.TargetStackBefore == 1 && targetStackAfter == 0)
                     {
-                        __state.SourceTracker.NutritionEntries.Insert(0, __state.TargetTracker.NutritionEntries[0]);
-                        __state.TargetTracker.NutritionEntries.RemoveAt(0);
-                        diff--;
+                        __state.SourceTracker.NutritionEntries.Insert(0, __state.TargetTracker.PartialNutrition);
+
+                        Log.Message($"[FoodTracker][MERGE] Append singleton merge detected, Source has absorbed Target. Target stack before: {__state.TargetStackBefore}, " +
+                            $"Source stack before: {__state.SourceStackBefore}, Target stack after: {targetStackAfter}, Source stack after: {sourceStackAfter}, " +
+                            $"Target List Count: {__state.TargetTracker.NutritionEntries.Count}, Source List Count: {__state.SourceTracker.NutritionEntries.Count}, " +
+                            $"Target Singleton State: {__state.TargetTracker.PartialNutrition}, Source Singleton State: {__state.SourceTracker.PartialNutrition}");
                     }
-                    // Same for Target stack as well.
-                    if (__state.TargetTracker.NutritionEntries.Count == 1)
+                    else
                     {
-                        __state.TargetTracker.PartialNutrition = __state.TargetTracker.NutritionEntries[0];
-                        __state.TargetTracker.NutritionEntries.Clear();
+                        __state.TargetTracker.NutritionEntries.Insert(0, __state.SourceTracker.PartialNutrition);
+
+                        Log.Message($"[FoodTracker][MERGE] Append singleton merge detected, Target has absorbed Source. Target stack before: {__state.TargetStackBefore}, " +
+                            $"Source stack before: {__state.SourceStackBefore}, Target stack after: {targetStackAfter}, Source stack after: {sourceStackAfter}, " +
+                            $"Target List Count: {__state.TargetTracker.NutritionEntries.Count}, Source List Count: {__state.SourceTracker.NutritionEntries.Count}, " +
+                            $"Target Singleton State: {__state.TargetTracker.PartialNutrition}, Source Singleton State: {__state.SourceTracker.PartialNutrition}");
                     }
+                    // Vanilla should've destroyed the other stack so we do not need to clear its list or reset its PartialNutrition.
+
+                    return;
+
                 }
 
-                return;
+                // Stack merge case: If both stacks had more than one item, we need to append the NutritionEntries lists both ways..
+                if (__state.TargetStackBefore > 1 && __state.SourceStackBefore > 1)
+                {
+                    if (diff > 0)
+                    {
 
+                        while (diff > 0 && __state.SourceTracker.NutritionEntries.Count > 0)
+                        {
+                            __state.TargetTracker.NutritionEntries.Insert(0, __state.SourceTracker.NutritionEntries[0]);
+                            __state.SourceTracker.NutritionEntries.RemoveAt(0);
+                            diff--;
+
+                            Log.Message($"[FoodTracker][MERGE] Stack merge detected, Target has absorbed Source. Target stack before: {__state.TargetStackBefore}, " +
+                                $"Source stack before: {__state.SourceStackBefore}, Target stack after: {targetStackAfter}, Source stack after: {sourceStackAfter}, " +
+                                $"Target List Count: {__state.TargetTracker.NutritionEntries.Count}, Source List Count: {__state.SourceTracker.NutritionEntries.Count}, " +
+                                $"Target Singleton State: {__state.TargetTracker.PartialNutrition}, Source Singleton State: {__state.SourceTracker.PartialNutrition}");
+                        }
+                        // We need to check for singleton conversion after the merge. If the target stack is now a singleton,
+                        // we need to set its PartialNutrition value and clear its NutritionEntries list.
+                        if (__state.SourceTracker.NutritionEntries.Count == 1)
+                        {
+                            __state.SourceTracker.PartialNutrition = __state.SourceTracker.NutritionEntries[0];
+                            __state.SourceTracker.NutritionEntries.Clear();
+
+                            Log.Message($"[FoodTracker][MERGE] Singleton conversion detected, Source has become a singleton. Source stack before: " +
+                                $"{__state.SourceStackBefore}, Source stack after: {sourceStackAfter}, Source List Count: {__state.SourceTracker.NutritionEntries.Count}, " +
+                                $"Source Singleton State: {__state.SourceTracker.PartialNutrition}");
+                        }
+                    }
+                    else
+                    {
+                        while (diff > 0 && __state.TargetTracker.NutritionEntries.Count > 0)
+                        {
+                            __state.SourceTracker.NutritionEntries.Insert(0, __state.TargetTracker.NutritionEntries[0]);
+                            __state.TargetTracker.NutritionEntries.RemoveAt(0);
+                            diff--;
+
+                            Log.Message($"[FoodTracker][MERGE] Stack merge detected, Source has absorbed Target. Target stack before: {__state.TargetStackBefore}, " +
+                                $"Source stack before: {__state.SourceStackBefore}, Target stack after: {targetStackAfter}, Source stack after: {sourceStackAfter}, " +
+                                $"Target List Count: {__state.TargetTracker.NutritionEntries.Count}, Source List Count: {__state.SourceTracker.NutritionEntries.Count}, " +
+                                $"Target Singleton State: {__state.TargetTracker.PartialNutrition}, Source Singleton State: {__state.SourceTracker.PartialNutrition}");
+                        }
+                        // Same for Target stack as well.
+                        if (__state.TargetTracker.NutritionEntries.Count == 1)
+                        {
+                            __state.TargetTracker.PartialNutrition = __state.TargetTracker.NutritionEntries[0];
+                            __state.TargetTracker.NutritionEntries.Clear();
+
+                            Log.Message($"[FoodTracker][MERGE] Singleton conversion detected, Target has become a singleton. Target stack before: " +
+                                $"{__state.TargetStackBefore}, Target stack after: {targetStackAfter}, Target List Count: {__state.TargetTracker.NutritionEntries.Count}, " +
+                                $"Target Singleton State: {__state.TargetTracker.PartialNutrition}");
+                        }
+                    }
+
+                    return;
+
+                }
+            }
+            finally
+            {
+                FoodTrackerStackOperations.MergeInProgress = false; 
             }
         }
     }

@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using RimWorld;
+using System.Collections.Generic;
 using UnityEngine;
 using Verse;
 
@@ -17,11 +18,12 @@ namespace FoodTracker
             var harmony = new Harmony("b0arl0ck.foodtracker");
             harmony.PatchAll();
 
-            // 3. Log Initialization
+            // 4. Log Initialization
             Log.Message($"[FoodTracker][T0] Initialization completed.");
 
         }
         public int TraceId { get; set; }
+
         public static FoodTrackerSettings settings;
 
         public override string SettingsCategory() => "Food Tracker";
