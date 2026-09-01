@@ -17,25 +17,6 @@ namespace FoodTracker
         // This is a number we use to scale eating duration time.
         public const float NutritionConsumptionRateMultiplier = 0.90f;
 
-        // Corrects a nutrition list or corrupted list if our list doesn't match the FoodTracker_ items in a stack.
-        public static void CorrectNutritionList(Thing thing, CompFoodTracker foodTracker)
-        {
-            // Cllear the elements out of the corrupted list.
-            foodTracker.NutritionEntries.Clear();
-
-            // Return the original (base def) of each item in the list.
-            ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(thing.def);
-
-            // Store the full nutrition of each base item.
-            float nutritionPerItem = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0;
-
-            for (int i = 0; i < thing.stackCount; i++)
-            {
-                // Store each nutrition value to their respective element in the list.
-                foodTracker.NutritionEntries.Add(nutritionPerItem);
-            }
-        }
-
         // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
         public static ThingDef GetOriginalMealDef(ThingDef mealDef)
         {

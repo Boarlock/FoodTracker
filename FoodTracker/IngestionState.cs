@@ -30,6 +30,8 @@ namespace FoodTracker
         // Runtime state.
         public float EatenFraction;
         public bool Finalized;
+        public bool DestroyFoodAfterIngestion;
+        public Thing FoodToDestroy;
     }
 
     public static class FoodTrackerIngestionTracker

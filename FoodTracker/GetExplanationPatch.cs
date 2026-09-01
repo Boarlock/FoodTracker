@@ -31,15 +31,26 @@ namespace FoodTracker
             string baseValueString = baseValue.ToString("N2");
             string baseFinal = descriptionBaseText + baseValueString + "\n\n";
 
-            // Build the string for our listed nutrition values.
+            // SINGLETON STATE
+            if (tracker.NutritionEntries.Count == 0)
+            {
+                string single = $"Final Value: {tracker.PartialNutrition:N2}";
+                __result = baseFinal + single;
+
+                return;
+            }
+
+            // STACK STATE
             StringBuilder mealList = new StringBuilder();
 
             for (int i = 0; i < tracker.NutritionEntries.Count; i++)
             {
-                mealList.AppendLine($"Item {i + 1}: {tracker.NutritionEntries[i]:0.00}");
+                mealList.AppendLine(
+                    $"Item {i + 1}: {tracker.NutritionEntries[i]:0.00}"
+                );
             }
 
             __result = baseFinal + mealList.ToString();
-        }   
+        }
     }
 }

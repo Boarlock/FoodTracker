@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <Compile Remove="CompPartialNutrition.cs" />
+    <Compile Remove="PatchAllStackCount.cs" />
   </ItemGroup>
 
   <ItemGroup>

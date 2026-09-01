@@ -33,19 +33,30 @@ namespace FoodTracker
             float totalNutrition = 0f;
             float nutritionPerItem = 0f;
 
-            List<float> nutritionEntriesBefore = null;
+            List<float> nutritionEntriesBefore = new List<float>();
 
             // FoodTracker meals use their actual individual tracked nutrition values.
             if (tracker != null)
             {
-
-                nutritionEntriesBefore = new List<float>(tracker.NutritionEntries);
-
-                int mealsToConsume = Mathf.Min(ingestCount, tracker.NutritionEntries.Count);
-
-                for (int i = 0; i < mealsToConsume; i++)
+                // SINGLETON STATE
+                if (tracker.NutritionEntries.Count == 0)
                 {
-                    totalNutrition += tracker.NutritionEntries[i];
+                    totalNutrition = tracker.PartialNutrition;
+                }
+                // STACK STATE
+                else
+                {
+                    nutritionEntriesBefore = new List<float>(tracker.NutritionEntries);
+
+                    int mealsToConsume = Mathf.Min(
+                        ingestCount,
+                        tracker.NutritionEntries.Count
+                    );
+
+                    for (int i = 0; i < mealsToConsume; i++)
+                    {
+                        totalNutrition += tracker.NutritionEntries[i];
+                    }
                 }
             }
             else
@@ -79,7 +90,7 @@ namespace FoodTracker
                 durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
 
                 if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker][T{__state.TraceID}] Eating duration: {originalDef.defName} (ID {food.ThingID}) " +
+                    Log.Message($"[FoodTracker][T{__state.TraceID}] Eating duration: {food.def.defName} (ID {food.thingIDNumber}) " +
                         $"| Ingest Count: {ingestCount} | Total Nutrition: {__state.TotalNutrition:F2} | Multiplier: {durationMultiplier:P0}");
 
                 return;
@@ -94,7 +105,7 @@ namespace FoodTracker
             durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{__state.TraceID}] Eating duration: {originalDef.defName} (ID {food.ThingID}) " +
+                Log.Message($"[FoodTracker][T{__state.TraceID}] Eating duration: {food.def.defName} (ID {food.thingIDNumber}) " +
                     $"| Ingest Count: {ingestCount} | Total Nutrition: {__state.TotalNutrition:F2} | Multiplier: {durationMultiplier:P0}");
 
         }
@@ -185,6 +196,13 @@ namespace FoodTracker
 
                 // ChewIngestible ended before the completion threshold and FinalizeIngest did not happen. Treat this as a genuine interruption.
                 IngestionInterruptionHandler.Handle(state);
+
+                // At this point the interruption handler has finished all
+                // synchronization and has marked any empty Thing for destruction.
+                if (state.DestroyFoodAfterIngestion && state.FoodToDestroy != null)
+                {
+                    DeferredFoodDestruction.Schedule(state.FoodToDestroy);
+                }
 
                 FoodTrackerIngestionTracker.Remove(chewer);
             });
