@@ -1,4 +1,6 @@
-﻿using Verse;
+﻿using RimWorld;
+using System.Collections.Generic;
+using Verse;
 
 namespace FoodTracker
 {
@@ -8,10 +10,10 @@ namespace FoodTracker
         public static Thing CreateAndDropPartialMeal(IngestionState state, float remainingNutrition, IntVec3 dropCell)
         {
             // Validate the input parameters.
-            if (state == null || state.Pawn == null || state.Food == null || state.Food.Destroyed)
+            if (state == null || state.Pawn == null || state.Food == null)
             {
                 Log.Warning($"[FoodTracker][T{state?.TraceID.ToString() ?? "?"}] Inputs are not valid. State Null: {state == null} | Pawn Null: {state?.Pawn == null} " +
-                    $"| Food Null: {state?.Food == null} | Food Destroyed: {state?.Food?.Destroyed ?? false}");
+                    $"| Food Null: {state?.Food == null}");
 
                 return null;
             }
@@ -28,6 +30,15 @@ namespace FoodTracker
 
             // Create a new partial meal Thing using the partial meal definition and get the tracker comp for it.
             Thing food = ThingMaker.MakeThing(partialDef);
+
+            CompIngredients ingredients = food.TryGetComp<CompIngredients>();
+
+            if (ingredients != null && state.IngredientsBefore != null)
+            {
+                ingredients.ingredients = new List<ThingDef>(state.IngredientsBefore);
+            }
+
+            // Check to see if it's a meat or vegetable meal, and if so, set the food kind accordingly.
 
             CompFoodTracker tracker = food.TryGetComp<CompFoodTracker>();
 
@@ -47,7 +58,7 @@ namespace FoodTracker
 
             tracker.PartialNutrition = remainingNutrition;
             tracker.NutritionEntries.Clear();
-            
+
             if (!GenDrop.TryDropSpawn(food, dropCell, state.Pawn.Map, ThingPlaceMode.Near, out Thing resultingThing))
 
             {
@@ -78,4 +89,3 @@ namespace FoodTracker
         }
     }
 }
-        

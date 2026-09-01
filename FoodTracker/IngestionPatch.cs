@@ -29,11 +29,18 @@ namespace FoodTracker
             int ingestCount = curJob?.count ?? 0;
 
             CompFoodTracker tracker = food.TryGetComp<CompFoodTracker>();
+            CompIngredients ingredients = food.TryGetComp<CompIngredients>();
 
             float totalNutrition = 0f;
             float nutritionPerItem = 0f;
 
             List<float> nutritionEntriesBefore = new List<float>();
+            List<ThingDef> ingredientsBefore = null;
+
+            if (ingredients != null && ingredients.ingredients != null)
+            {
+                ingredientsBefore = new List<ThingDef>(ingredients.ingredients);
+            }
 
             // FoodTracker meals use their actual individual tracked nutrition values.
             if (tracker != null)
@@ -80,7 +87,8 @@ namespace FoodTracker
                 StartingStackCount = food.stackCount,
                 IngestCount = ingestCount,
                 TotalNutrition = totalNutrition,
-                NutritionEntriesBefore = nutritionEntriesBefore
+                NutritionEntriesBefore = nutritionEntriesBefore,
+                IngredientsBefore = ingredientsBefore
 
             };
 

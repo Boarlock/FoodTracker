@@ -1,5 +1,4 @@
-﻿using RimWorld;
-using UnityEngine;
+﻿using UnityEngine;
 using Verse;
 
 namespace FoodTracker
@@ -55,7 +54,7 @@ namespace FoodTracker
 
                     return;
                 }
-                
+
             }
 
             float nutritionEaten = state.TotalNutrition * state.EatenFraction;
@@ -124,9 +123,9 @@ namespace FoodTracker
                 {
                     state.Food.stackCount -= itemsRemoved;
                 }
-            
 
-            if (FoodTrackerSettings.Verbose)
+
+                if (FoodTrackerSettings.Verbose)
                     Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
                         $"| Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
                         $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} | Total Remaining: {(state.TotalNutrition - nutritionEaten):F2} " +
@@ -221,7 +220,7 @@ namespace FoodTracker
             FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
 
             return;
-            
+
         }
     }
 }

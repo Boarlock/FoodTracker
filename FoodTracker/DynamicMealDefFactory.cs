@@ -1,7 +1,6 @@
 ﻿using RimWorld;
-using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Reflection.Emit;
 using Verse;
 
 namespace FoodTracker
@@ -36,6 +35,7 @@ namespace FoodTracker
             // Make the partial meal Un-Stackable, set the name, append partial to description
             childDef.defName = newDefName;
             childDef.description = state.FoodDef.description + " (Partial)";
+            childDef.label = state.FoodDef.label + " (Partial)";
 
             // Set the tracking component
             if (state.FoodDef.comps != null)
@@ -46,7 +46,7 @@ namespace FoodTracker
             childDef.comps.Add(new CompProperties_FoodTracker());
 
             RegisterGeneratedThingDef(childDef);
-            
+
             if (FoodTrackerSettings.Verbose)
                 Log.Message($"[FoodTracker][T{state.TraceID}] ThingDef {childDef.defName} has been successfully created.");
 

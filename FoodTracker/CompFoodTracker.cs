@@ -1,6 +1,5 @@
 ﻿using RimWorld;
 using System.Collections.Generic;
-using UnityEngine;
 using Verse;
 
 namespace FoodTracker
@@ -33,9 +32,9 @@ namespace FoodTracker
             {
                 return nutritionEntries;
             }
-            set 
-            { 
-                nutritionEntries = value; 
+            set
+            {
+                nutritionEntries = value;
             }
         }
 

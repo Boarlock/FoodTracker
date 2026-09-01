@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using RimWorld;
+using System.Collections.Generic;
 using Verse;
 
 namespace FoodTracker
@@ -10,6 +11,7 @@ namespace FoodTracker
         // Internal ID to track each ingestion.
         public int TraceID;
         public List<float> NutritionEntriesBefore;
+        public List<ThingDef> IngredientsBefore;
 
         // Captured during Prefix while the Food Thing is still reliable.
         public Pawn Pawn;

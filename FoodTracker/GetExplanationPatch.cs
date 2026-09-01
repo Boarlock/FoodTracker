@@ -53,4 +53,45 @@ namespace FoodTracker
             __result = baseFinal + mealList.ToString();
         }
     }
+
+    [HarmonyPatch(typeof(StatWorker), nameof(StatWorker.GetStatDrawEntryLabel))]
+    public static class GetStatDrawEntryLabelPatch
+    {
+        public static bool Prefix(StatWorker __instance, StatDef stat, float value, ToStringNumberSense numberSense, StatRequest optionalReq, bool finalized, ref string __result)
+        {
+            if (stat != StatDefOf.Nutrition)
+                return true;
+
+            if (!optionalReq.HasThing)
+                return true;
+
+            Thing thing = optionalReq.Thing;
+
+            CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
+
+            if (tracker == null)
+                return true;
+
+            float nutrition;
+
+            // Singleton FT meal.
+            if (tracker.NutritionEntries.Count == 0)
+            {
+                nutrition = tracker.PartialNutrition;
+            }
+
+            // Stack FT meal.
+            else
+            {
+                nutrition = 0f;
+
+                for (int i = 0; i < tracker.NutritionEntries.Count; i++)
+                    nutrition += tracker.NutritionEntries[i];
+            }
+
+            __result = stat.ValueToString(nutrition, numberSense, finalized);
+
+            return false;
+        }
+    }
 }

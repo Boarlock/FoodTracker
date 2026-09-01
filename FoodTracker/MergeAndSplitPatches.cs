@@ -193,11 +193,11 @@ namespace FoodTracker
 
     [HarmonyPatch(typeof(Thing), nameof(Thing.TryAbsorbStack))]
 
-   public class StackMergePatch
+    public class StackMergePatch
     {
         public static void Prefix(Thing __instance, Thing other, bool respectStackLimit, out StackMergeState __state)
         {
-                __state = null;
+            __state = null;
 
             if (__instance == null || other == null)
                 return;
@@ -239,11 +239,11 @@ namespace FoodTracker
                 ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(__instance.def);
                 __state.TargetTracker.PartialNutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
             }
-            else if 
+            else if
                 (__state.SourceTracker.NutritionEntries.Count == 0 && __state.SourceTracker.PartialNutrition < 0f)
             {
-                    ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(other.def);
-                    __state.SourceTracker.PartialNutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
+                ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(other.def);
+                __state.SourceTracker.PartialNutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
             }
 
             // Singleton merge case: If either stack was a singleton, we need to add
@@ -284,7 +284,7 @@ namespace FoodTracker
                 {
                     __state.SourceTracker.NutritionEntries.Insert(0, __state.TargetTracker.PartialNutrition);
                 }
-                else 
+                else
                 {
                     __state.TargetTracker.NutritionEntries.Insert(0, __state.SourceTracker.PartialNutrition);
                 }

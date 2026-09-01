@@ -1,6 +1,4 @@
-﻿using RimWorld;
-using System.Diagnostics;
-using UnityEngine;
+﻿using UnityEngine;
 using Verse;
 
 namespace FoodTracker
@@ -221,7 +219,7 @@ namespace FoodTracker
             {
                 survivingStack.stackCount -= itemsRemoved;
             }
-            
+
             if (FoodTrackerSettings.Verbose)
                 Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
                     $"Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
