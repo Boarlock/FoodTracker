@@ -55,9 +55,7 @@ namespace FoodTracker
                 {
                     nutritionEntriesBefore = new List<float>(tracker.NutritionEntries);
 
-                    int mealsToConsume = Mathf.Min(
-                        ingestCount,
-                        tracker.NutritionEntries.Count
+                    int mealsToConsume = Mathf.Min(ingestCount, tracker.NutritionEntries.Count
                     );
 
                     for (int i = 0; i < mealsToConsume; i++)
