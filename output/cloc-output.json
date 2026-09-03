@@ -1,0 +1,29 @@
+{"header" : {
+  "cloc_url"           : "github.com/AlDanial/cloc",
+  "cloc_version"       : "1.98",
+  "elapsed_seconds"    : 0.0177929401397705,
+  "n_files"            : 18,
+  "n_lines"            : 2366,
+  "files_per_second"   : 1011.63719197631,
+  "lines_per_second"   : 132974.088678664,
+  "report_file"        : "../output/cloc-output.json"},
+"C#" :{
+  "nFiles": 16,
+  "blank": 482,
+  "comment": 213,
+  "code": 1542},
+"MSBuild script" :{
+  "nFiles": 1,
+  "blank": 16,
+  "comment": 0,
+  "code": 59},
+"Python" :{
+  "nFiles": 1,
+  "blank": 10,
+  "comment": 0,
+  "code": 44},
+"SUM": {
+  "blank": 508,
+  "comment": 213,
+  "code": 1645,
+  "nFiles": 18} }
