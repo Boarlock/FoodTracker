@@ -1,25 +1,31 @@
 ﻿using Verse;
+using System.Collections.Generic;
 
 namespace FoodTracker
 {
     internal class DeferredFoodDestruction
     {
-        public static void Schedule(Thing food)
+        public static void Schedule(List<Thing> food)
         {
 
             if (food == null)
                 return;
 
-            CompFoodTracker tracker = food.TryGetComp<CompFoodTracker>();
+            CompFoodTracker tracker = food[0].TryGetComp<CompFoodTracker>();
 
             if (tracker != null)
             {
                 tracker.NutritionEntries.Clear();
+                tracker.PartialNutrition = -1f;
             }
 
-            if (food.Destroyed != true)
-                food.Destroy(DestroyMode.Vanish);
+            foreach (Thing thing in food) 
+            {
+                if (thing != null && !thing.Destroyed)
+                    thing.Destroy();
 
+
+            }
         }
     }
 }

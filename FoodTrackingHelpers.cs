@@ -8,15 +8,6 @@ namespace FoodTracker
 
     {
 
-        // If nutrition is below this threshold treat as interrupted, otherwise FoodTracker does not interfere with ingestion completion.
-        public const float MealCompletionThreshold = 0.99f;
-
-        // This is a number we use internally to classify if something is treated as a meal or a batch food item (to make a partial variant or not to).
-        public const float MealQualifierThreshold = 0.01f;
-
-        // This is a number we use to scale eating duration time.
-        public const float NutritionConsumptionRateMultiplier = 0.90f;
-
         // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
         public static ThingDef GetOriginalMealDef(ThingDef mealDef)
         {
@@ -35,21 +26,7 @@ namespace FoodTracker
             return DefDatabase<ThingDef>.GetNamedSilentFail(originalDefName);
         }
 
-        // Determines if the target food is a batch food item that should not be subdivided into partials.
-        public static bool IsBatchFood(ThingDef foodDef)
-        {
-            if (foodDef == null)
-            {
-                Log.Warning($"[FoodTracker] Input is not valid. ThingDef Null: {foodDef == null}");
-
-                return false;
-            }
-
-            float nutrition = foodDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
-
-            return nutrition < MealQualifierThreshold;
-        }
-
+        // If pawn is not human and food doesn't give nutrition then we don't run FoodTracker
         public static bool ValidateFoodEatingAttempt(Pawn pawn, Thing food)
         {
 
@@ -89,14 +66,16 @@ namespace FoodTracker
                 return;
             }
             
+            // Calculate current hunger level and max total hunger to see how much the pawn could eat.
             float currentHungerLevel = state.Pawn.needs.food.CurLevel;
             float maxHungerLevel = state.Pawn.needs.food.MaxLevel; // 1.0 for humans
             float roomInStomach = maxHungerLevel - currentHungerLevel;
 
+            // Then this caps the max amount eaten to what the pawn can eat.
             float actualNutritionEaten = Mathf.Min(nutrition, roomInStomach);
 
+            // Add the true amount eaten to the pawns current hunger and lifetime records.
             state.Pawn.needs.food.CurLevel += actualNutritionEaten;
-
             state.Pawn.records.AddTo(RecordDefOf.NutritionEaten, actualNutritionEaten);
 
         }

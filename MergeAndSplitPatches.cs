@@ -68,7 +68,6 @@ namespace FoodTracker
             if (__state == null || __result == null)
                 return;
 
-            CompFoodTracker resultTracker = null;
             List<float> resultNutritionHistory = null;
             float resultPartialNutrition = -1f;
 
@@ -81,7 +80,7 @@ namespace FoodTracker
                 return;
 
             // We get the FT component for both the source stack and the resulting stack after the split.
-            resultTracker = __result.TryGetComp<CompFoodTracker>();
+            CompFoodTracker resultTracker = __result.TryGetComp<CompFoodTracker>();
             CompFoodTracker sourceTracker = __state.SourceTracker;
 
             if (sourceTracker == null || resultTracker == null)
@@ -168,7 +167,7 @@ namespace FoodTracker
 
     public class StackMergePatch
     {
-        public static void Prefix(Thing __instance, Thing other, bool respectStackLimit, out StackMergeState __state)
+        public static void Prefix(Thing __instance, Thing other, out StackMergeState __state)
         {
             __state = null;
 
@@ -205,7 +204,7 @@ namespace FoodTracker
             FoodTrackerStackOperations.MergeInProgress = true;
 
         }
-        public static void Postfix(Thing __instance, Thing other, bool respectStackLimit, StackMergeState __state)
+        public static void Postfix(Thing __instance, Thing other, StackMergeState __state)
         {
 
             if (__state == null)

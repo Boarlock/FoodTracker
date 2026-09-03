@@ -11,15 +11,18 @@ namespace FoodTracker
         public int TraceID;
         public List<float> NutritionEntriesBefore;
         public List<ThingDef> IngredientsBefore;
+        public List<Thing> ThingsToDestroy = new List<Thing>();
 
         // Captured during Prefix while the Food Thing is still reliable.
         public Pawn Pawn;
-        public Thing Food;
+        public Thing PreFood;
+        public Thing PostFood;
         public ThingDef FoodDef;
         public ThingDef BaseDef;
         public ThingDef TrackerDef;
-        public int StartingStackCount;
         public int IngestCount;
+        public int PreStackCount;
+        public int PostStackCount;
         public float TotalNutrition;
         public float NutritionPerItem;
 
@@ -32,7 +35,6 @@ namespace FoodTracker
         public float EatenFraction;
         public bool Finalized;
         public bool DestroyFoodAfterIngestion;
-        public Thing FoodToDestroy;
     }
 
     public static class FoodTrackerIngestionTracker

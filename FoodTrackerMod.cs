@@ -22,12 +22,15 @@ namespace FoodTracker
             Log.Message($"[FoodTracker][T0] Initialization completed.");
 
         }
+
+        // Trace ID to track each ingestion attempt.
         public int TraceId { get; set; }
 
         public static FoodTrackerSettings settings;
 
         public override string SettingsCategory() => "Food Tracker";
 
+        // Draw the settings windows in the menu.
         public override void DoSettingsWindowContents(Rect inRect)
         {
             Listing_Standard listing = new Listing_Standard();

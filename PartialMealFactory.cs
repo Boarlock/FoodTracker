@@ -10,80 +10,74 @@ namespace FoodTracker
         public static Thing CreateAndDropPartialMeal(IngestionState state, float remainingNutrition, IntVec3 dropCell)
         {
             // Validate the input parameters.
-            if (state == null || state.Pawn == null || state.Food == null)
+            if (state == null || state.Pawn == null || state.PreFood == null)
             {
                 Log.Warning($"[FoodTracker][T{state?.TraceID.ToString() ?? "?"}] Inputs are not valid. State Null: {state == null} | Pawn Null: {state?.Pawn == null} " +
-                    $"| Food Null: {state?.Food == null}");
+                    $"| Food Null: {state?.PreFood == null}");
 
                 return null;
             }
 
-            // Get the partial meal definition corresponding to the vanilla meal. If no partial meal definition is found it returns.
-            ThingDef partialDef = DynamicMealDefFactory.CreateTrackerMeal(state.FoodDef);
+            // Try to get the partial meal definition corresponding to the vanilla meal. If no partial meal definition is found it returns.
+            ThingDef partialDef = state.TrackerDef;
 
             if (partialDef == null)
             {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] No corresponding partial meal found for {state.Food.def.defName} (ID {state.Food.thingIDNumber}).");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] No corresponding partial meal found for {state.PreFood.def.defName} (ID {state.PreFood.thingIDNumber}).");
 
                 return null;
             }
 
             // Create a new partial meal Thing using the partial meal definition and get the tracker comp for it.
-            Thing food = ThingMaker.MakeThing(partialDef);
+            Thing partial = ThingMaker.MakeThing(partialDef);
 
-            CompIngredients ingredients = food.TryGetComp<CompIngredients>();
+            // Check to see if the new partial meal has a CompFoodTracker component. If it doesn't, log a warning and destroy the partial meal.
+            CompFoodTracker tracker = partial.TryGetComp<CompFoodTracker>();
+
+            // If created item doesn't for any reason contain our component then delete it.
+            if (tracker == null && !partial.Destroyed)
+            {
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Component missing from {state.TrackerDef.defName} (ID {partial?.thingIDNumber ?? 0})");
+
+                state.ThingsToDestroy.Add(partial);
+                state.DestroyFoodAfterIngestion = true;
+
+                return null;
+            }
+
+            // Access the new partials ingredients comp and set the ingredients to match the original meal's ingredients.
+            CompIngredients ingredients = partial.TryGetComp<CompIngredients>();
 
             if (ingredients != null && state.IngredientsBefore != null)
             {
                 ingredients.ingredients = new List<ThingDef>(state.IngredientsBefore);
             }
 
-            // Check to see if it's a meat or vegetable meal, and if so, set the food kind accordingly.
-
-            CompFoodTracker tracker = food.TryGetComp<CompFoodTracker>();
-
-            // If created item doesn't for any reason contain our component then delete it.
-            if (tracker == null)
-            {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Component missing from {food?.def?.defName ?? "NULL"} (ID {food.thingIDNumber})");
-
-                if (!food.Destroyed)
-                {
-                    state.FoodToDestroy = state.Food;
-                    state.DestroyFoodAfterIngestion = true;
-                }
-
-                return null;
-            }
-
+            // Set the new food's Partial Nutrition component.
             tracker.PartialNutrition = remainingNutrition;
             tracker.NutritionEntries.Clear();
 
-            if (!GenDrop.TryDropSpawn(food, dropCell, state.Pawn.Map, ThingPlaceMode.Near, out Thing resultingThing))
+            if (!GenDrop.TryDropSpawn(partial, dropCell, state.Pawn.Map, ThingPlaceMode.Near, out Thing resultingThing))
 
             {
                 Log.Warning($"[FoodTracker][T{state.TraceID}] Failed to drop {resultingThing?.def.defName ?? "NULL"} (ID {resultingThing?.thingIDNumber ?? 0})");
 
                 // If the drop failed, don't leave a ghost item in the world. Destroy the partial meal to prevent it from lingering.
-                if (!food.Destroyed)
+                if (resultingThing == null && !resultingThing.Destroyed)
                 {
-                    state.FoodToDestroy = state.Food;
+                    Log.Warning($"[FoodTracker][T{state.TraceID}] Failed to make {resultingThing?.def.defName ?? "NULL"} (ID {resultingThing?.thingIDNumber ?? 0})");
+
+                    state.ThingsToDestroy.Add(resultingThing);
                     state.DestroyFoodAfterIngestion = true;
+
+                    return null;
                 }
 
                 return null;
             }
 
-            if (resultingThing == null)
-            {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Failed to make {resultingThing?.def.defName ?? "NULL"} (ID {resultingThing?.thingIDNumber ?? 0})");
-
-                return null;
-            }
-
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{state.TraceID}] Partial meal created: {resultingThing.def.defName} (ID {resultingThing.thingIDNumber}) " +
-                    $"| Nutrition: {remainingNutrition:F2}");
+                Log.Message($"[FoodTracker][T{state.TraceID}] Partial meal created: {resultingThing.def.defName} (ID {resultingThing.thingIDNumber}) | Nutrition Remaining: {remainingNutrition:F2}");
 
             return resultingThing;
         }

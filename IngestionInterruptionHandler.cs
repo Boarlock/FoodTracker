@@ -8,34 +8,23 @@ namespace FoodTracker
         public static void Handle(IngestionState state)
         {
 
-            if (state == null || state.Pawn == null || state.Food == null || state.FoodDef == null)
+            if (state == null || state.Pawn == null || state.PostFood == null || state.FoodDef == null)
             {
                 Log.Warning($"[FoodTracker][T{state?.TraceID.ToString() ?? "?"}] Inputs are not valid. State Null: {state == null} | Pawn Null: {state.Pawn == null} " +
-                    $"| Food Null: {state.Food == null} | ThingDef Null: {state.FoodDef == null}");
+                    $"| Food Null: {state.PostFood == null} | ThingDef Null: {state.FoodDef == null}");
 
                 return;
             }
 
-            CompFoodTracker tracker = state.Food.TryGetComp<CompFoodTracker>();
+            CompFoodTracker tracker = state.PostFood.TryGetComp<CompFoodTracker>();
 
             // Rimworld may destroy original Thing, particularly when Un-Drafting a pawn eating on a stack.
-            if (state.Food.Destroyed)
+            if (state.PostFood.Destroyed)
             {
-                // Checking to see if its a destroyed batch food.
-                if (FoodTrackingHelpers.IsBatchFood(state.FoodDef))
+                if (tracker != null)
                 {
                     if (FoodTrackerSettings.Verbose)
-                        Log.Message($"[FoodTracker][T{state.TraceID}] {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
-                            $"| Food Thing reference has been .Destroyed(), handling with DestroyedFoodRecovery.");
-
-                    DestroyedFoodRecovery.HandleDestroyedBatchFood(state);
-
-                    return;
-                }
-                else if (tracker != null)
-                {
-                    if (FoodTrackerSettings.Verbose)
-                        Log.Message($"[FoodTracker][T{state.TraceID}] {state.FoodDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
+                        Log.Message($"[FoodTracker][T{state.TraceID}] {state.FoodDef.defName} (ID {state?.PostFood?.thingIDNumber ?? 0}) " +
                             $"| Food Thing reference has been .Destroyed(), handling with DestroyedFoodRecovery.");
 
                     // Otherwise process as a destroyed FoodTracker meal.
@@ -46,7 +35,7 @@ namespace FoodTracker
                 else
                 {
                     if (FoodTrackerSettings.Verbose)
-                        Log.Message($"[FoodTracker][T{state.TraceID}] {state.FoodDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
+                        Log.Message($"[FoodTracker][T{state.TraceID}] {state.FoodDef.defName} (ID {state?.PostFood?.thingIDNumber ?? 0}) " +
                             $"| Food Thing reference has been .Destroyed(), handling with DestroyedFoodRecovery.");
 
                     // Otherwise process as a destroyed meal.
@@ -54,19 +43,24 @@ namespace FoodTracker
 
                     return;
                 }
-
             }
 
+            // Calculate nutrition eaten.
             float nutritionEaten = state.TotalNutrition * state.EatenFraction;
+
+            // Used in FoodTracker loop to iterate through nutrition entries, nextItem is next item to process.
             float nutritionRemainder = nutritionEaten;
-            int itemsRemoved = 0;
             float nextItem = 0;
+
+            // Initialize items to remove from the stack that is dropped after interruption.
+            int itemsRemoved = 0;
 
             if (tracker != null)
             {
 
                 while (nutritionRemainder > 0f)
                 {
+                    // Seperate cases for singletons and tracked nutrition lists.
                     if (state.NutritionEntriesBefore.Count > 0)
                         nextItem = state.NutritionEntriesBefore[0];
                     else
@@ -74,6 +68,7 @@ namespace FoodTracker
 
                     if (nutritionRemainder < nextItem)
                     {
+                        // Set either the singleton or the next item in the list with the remaining nutrition.
                         if (state.NutritionEntriesBefore.Count > 0)
                             state.NutritionEntriesBefore[0] = nextItem - nutritionRemainder;
                         else
@@ -88,45 +83,45 @@ namespace FoodTracker
                         state.NutritionEntriesBefore.RemoveAt(0);
                 }
 
-                // Now the nutrition representation is authoritative.
+                // If the list is empty this clears it.
                 if (state.NutritionEntriesBefore.Count == 0)
                 {
-                    // Singleton FT meal. PartialNutrition was already updated above.
                     tracker.NutritionEntries.Clear();
                 }
+                // If the list has one item this sets the partial nutrition and clears it.
                 else if (state.NutritionEntriesBefore.Count == 1)
                 {
-                    // Singleton FT meal.
                     tracker.PartialNutrition = state.NutritionEntriesBefore[0];
                     tracker.NutritionEntries.Clear();
                 }
+                // If the ingest job was only one then only one partial meal can exist.
                 else if (state.IngestCount == 1)
                 {
                     // Also.. Singleton FT meal.
                     tracker.PartialNutrition = state.NutritionEntriesBefore[0];
                     tracker.NutritionEntries.Clear();
                 }
+                // Otherwise treat as a stack of tracked meals, this resets the singleton and sets the actual nutrition lists from the working list.
                 else
                 {
-                    // Stack FT meal. Clear the singleton and restore the nutrition entries.
                     tracker.PartialNutrition = -1f;
                     tracker.NutritionEntries = state.NutritionEntriesBefore;
                 }
 
-                // Now synchronize the physical Thing.
-                if (itemsRemoved >= state.Food.stackCount)
+                // If items to be removed equal or exceed the stack count then set the Thing for destruction.
+                if (itemsRemoved >= state.PostFood.stackCount)
                 {
-                    state.FoodToDestroy = state.Food;
+                    state.ThingsToDestroy.Add(state.PostFood);
                     state.DestroyFoodAfterIngestion = true;
                 }
+                // Otherwise stubtract items to remove from the stack count.
                 else
                 {
-                    state.Food.stackCount -= itemsRemoved;
+                    state.PostFood.stackCount -= itemsRemoved;
                 }
 
-
                 if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
+                    Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state.PostFood.thingIDNumber}) " +
                         $"| Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
                         $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} | Total Remaining: {(state.TotalNutrition - nutritionEaten):F2} " +
                         $"| Partial Nutrition: {(nextItem - nutritionRemainder)} | Whole Items Remaining: {(state.IngestCount - itemsRemoved)}");
@@ -138,47 +133,15 @@ namespace FoodTracker
 
             }
 
-            // Calculate exact, whole and nutrition eaten, and nutrition leftover in food.
+            // Calculate exact fraction eaten and whole items eaten.
             float exactItemsEaten = nutritionEaten / state.NutritionPerItem;
-            int wholeItemsEaten = Mathf.FloorToInt(exactItemsEaten);
 
-            if (FoodTrackingHelpers.IsBatchFood(state.FoodDef))
-            {
-                // Vanilla restored the food to the stack and no whole batch items were consumed.
-                if (wholeItemsEaten <= 0)
-                {
-                    return;
-                }
-
-                // For batch foods simply round to nearest int.
-                itemsRemoved = Mathf.RoundToInt(exactItemsEaten);
-                nutritionEaten = itemsRemoved * state.NutritionPerItem;
-
-                if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
-                        $"| Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
-                        $"| Total Nutrition: {state.TotalNutrition:F2} | Whole Items Remaining: {(state.IngestCount - (wholeItemsEaten - 1))}");
-
-                if (itemsRemoved >= state.Food.stackCount)
-                {
-                    state.FoodToDestroy = state.Food;
-                    state.DestroyFoodAfterIngestion = true;
-                }
-                else
-                    state.Food.stackCount -= itemsRemoved;
-
-                // Give the pawn and its records the amount removed from the food.
-                FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
-
-                return;
-            }
-
-            // Calculate nutrition to go into a partial and items to remove
+            // Calculate nutrition to go into a partial and items to remove from stack.
             itemsRemoved = Mathf.CeilToInt(exactItemsEaten);
             float nutritionIntoPartial = ((state.TotalNutrition - nutritionEaten) % state.NutritionPerItem);
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
+                Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state.PostFood.thingIDNumber}) " +
                     $"| Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
                     $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} | Total Remaining: {(state.TotalNutrition - nutritionEaten):F2} " +
                     $"| Partial Nutrition: {nutritionIntoPartial:F2} | Whole Items Remaining: {(state.IngestCount - itemsRemoved)}");
@@ -190,17 +153,21 @@ namespace FoodTracker
             {
                 Log.Warning($"[FoodTracker][T{state.TraceID}] Failed to make {state.TrackerDef.defName} (ID {newFood?.thingIDNumber ?? 0})");
 
+                // If failed to create a partial meal then remove one from items to remove and correct nutrition to give to pawn.
                 float nutritionCorrection = itemsRemoved * state.NutritionPerItem;
-
                 itemsRemoved--;
 
-                if (itemsRemoved >= state.Food.stackCount)
+                // If items to be removed equal or exceed the stack count then set the Thing for destruction.
+                if (itemsRemoved >= state.PostFood.stackCount)
                 {
-                    state.FoodToDestroy = state.Food;
+                    state.ThingsToDestroy.Add(state.PostFood);
                     state.DestroyFoodAfterIngestion = true;
                 }
+                // Otherwise stubtract items to remove from the stack count.
                 else
-                    state.Food.stackCount -= itemsRemoved;
+                {
+                    state.PostFood.stackCount -= itemsRemoved;
+                }
 
                 // Give the pawn and its records exactly the amount removed from the food.
                 FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionCorrection);
@@ -208,13 +175,17 @@ namespace FoodTracker
                 return;
             }
 
-            if (itemsRemoved >= state.Food.stackCount)
+            // If items to be removed equal or exceed the stack count then set the Thing for destruction.
+            if (itemsRemoved >= state.PostFood.stackCount)
             {
-                state.FoodToDestroy = state.Food;
+                state.ThingsToDestroy.Add(state.PostFood);
                 state.DestroyFoodAfterIngestion = true;
             }
+            // Otherwise stubtract items to remove from the stack count.
             else
-                state.Food.stackCount -= itemsRemoved;
+            {
+                state.PostFood.stackCount -= itemsRemoved;
+            }
 
             // Give the pawn and its records exactly the amount removed from the food.
             FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
