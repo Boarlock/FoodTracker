@@ -1,0 +1,75 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+  </PropertyGroup>
+	
+  <PropertyGroup>
+	<RimWorldManagedPath>..\..\..\..\..\..\..\Games\Rimworld\RimWorldWin64_Data\Managed</RimWorldManagedPath>
+  </PropertyGroup>
+	        
+  <ItemGroup>
+    <Compile Remove="-temp-CompDumper.cs" />
+    <Compile Remove="CompPartialNutrition.cs" />
+    <Compile Remove="PatchAllStackCount.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.46">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+	  <Reference Include="0Harmony">
+		  <HintPath>0Harmony.dll</HintPath>
+		  <Private>true</Private>
+	  </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>..\..\..\..\..\..\Games\Rimworld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
+    </Reference>
+	  
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>..\..\..\..\..\..\Games\Rimworld\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+	<Target Name="MergeHarmony" AfterTargets="CopyFilesToOutputDirectory">
+
+		<ItemGroup>
+			<AssembliesToMerge Include="$(TargetPath)" />
+			<AssembliesToMerge Include="$(TargetDir)0Harmony.dll" />
+
+			<ILRepackLibraryPath Include="$(RimWorldManagedPath)" />
+		</ItemGroup>
+
+		<PropertyGroup>
+			<Internalize>true</Internalize>
+			<MergedOutput>$(TargetDir)FoodTracker_Merged.dll</MergedOutput>
+		</PropertyGroup>
+
+		<ILRepack
+			InputAssemblies="@(AssembliesToMerge)"
+			OutputFile="$(MergedOutput)"
+			TargetKind="SameAsPrimaryAssembly"
+			DebugInfo="true"
+			AllowDuplicateResources="false"
+			Parallel="true"
+			LibraryPath="@(ILRepackLibraryPath)"
+			Internalize="$(Internalize)"
+    />
+
+		<Copy
+			SourceFiles="$(MergedOutput)"
+			DestinationFiles="$(TargetPath)"
+			OverwriteReadOnlyFiles="true" />
+
+		<Delete Files="$(MergedOutput)" />
+
+	</Target>
+
+</Project>
