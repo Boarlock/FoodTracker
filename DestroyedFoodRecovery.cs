@@ -20,7 +20,7 @@ namespace FoodTracker
             float nutritionEaten = state.TotalNutrition * state.EatenFraction;
             float exactItemsEaten = nutritionEaten / state.NutritionPerItem;
             int wholeItemsEaten = Mathf.FloorToInt(exactItemsEaten);
-            float nutritionIntoPartial = state.TotalNutrition - nutritionEaten;
+            float nutritionIntoPartial = ((state.TotalNutrition - nutritionEaten) % state.NutritionPerItem);
             int itemsRemoved = Mathf.CeilToInt(exactItemsEaten);
 
             // Get map of pawn which is where destroyedFood resided before destruction.
@@ -98,7 +98,7 @@ namespace FoodTracker
                     $"Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
                     $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} | Total Remaining: {(state.TotalNutrition - nutritionEaten):F2} " +
                     $"| Partial Meal: {partialMeal.def.defName} (ID {partialMeal.thingIDNumber}) | Partial Nutrition: {nutritionIntoPartial:F2} " +
-                    $"| Whole Items Remaining: {(state.IngestCount - wholeItemsEaten)}");
+                    $"| Whole Items Remaining: {(state.IngestCount - itemsRemoved)}");
 
             // Give the pawn and its records exactly the amount removed from the food.
             FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
@@ -223,8 +223,7 @@ namespace FoodTracker
             if (FoodTrackerSettings.Verbose)
                 Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state?.Food?.thingIDNumber ?? 0}) " +
                     $"Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
-                    $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} | Total Remaining: {(state.TotalNutrition - nutritionEaten):F2} " +
-                    $"| Whole Items Remaining: {(state.IngestCount - itemsRemoved) - 1}");
+                    $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} | Total Remaining: {(state.TotalNutrition - nutritionEaten):F2}"); 
 
             // Give the pawn and its records exactly the amount removed from the food.
             FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);

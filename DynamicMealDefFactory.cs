@@ -34,6 +34,7 @@ namespace FoodTracker
             childDef.defName = newDefName;
             childDef.description = mealDef.description + " (Partial)";
             childDef.label = mealDef.label + " (Partial)";
+            childDef.ClearCachedData();
 
             if (mealDef.comps != null)
                 childDef.comps = new List<CompProperties>(mealDef.comps);

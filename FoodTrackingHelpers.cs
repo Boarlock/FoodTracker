@@ -12,7 +12,7 @@ namespace FoodTracker
         public const float MealCompletionThreshold = 0.99f;
 
         // This is a number we use internally to classify if something is treated as a meal or a batch food item (to make a partial variant or not to).
-        public const float MealQualifierThreshold = 0.225f;
+        public const float MealQualifierThreshold = 0.01f;
 
         // This is a number we use to scale eating duration time.
         public const float NutritionConsumptionRateMultiplier = 0.90f;
