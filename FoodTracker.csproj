@@ -9,9 +9,7 @@
   </PropertyGroup>
 	        
   <ItemGroup>
-    <Compile Remove="-temp-CompDumper.cs" />
-    <Compile Remove="CompPartialNutrition.cs" />
-    <Compile Remove="PatchAllStackCount.cs" />
+    <Compile Remove="Experiments\**" />
   </ItemGroup>
 
   <ItemGroup>
