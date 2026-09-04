@@ -133,7 +133,7 @@ namespace FoodTracker
                 // Let vanilla initialize the toil exactly as normal.
                 originalInit?.Invoke();
 
-                // Capture ticks immediately after Toil Init then capture food.
+                // Capture total ticks immediately after Toil Init then capture food.
                 int totalTicks = Mathf.Max(1, chewer.jobs.curDriver.ticksLeftThisToil);
                 Thing food = chewer.CurJob?.GetTarget(ingestibleInd).Thing;
 
@@ -162,6 +162,7 @@ namespace FoodTracker
                 if (FoodTrackerSettings.Verbose)
                     Log.Message($"[FoodTracker][T{state.TraceID}] Eating started: {state.FoodDef.defName} (ID {state.PostFood.thingIDNumber}) " +
                         $"| Pawn: {state.Pawn} | Ingest Count: {state.IngestCount} | Available Nutrition: {state.TotalNutrition:F2}");
+
             };
 
             // Wrap vanilla's tick action.
@@ -179,11 +180,13 @@ namespace FoodTracker
 
                 // Update the fraction of food eaten based on ticks left and total ticks.
                 state.EatenFraction = Mathf.Clamp01(1f - ((float)ticksLeft / state.TotalTicks));
+
             };
 
             // Wrap vanilla's finish action to handle completion or interruption.
             toil.AddFinishAction(() =>
             {
+
                 if (state == null)
                     return;
 

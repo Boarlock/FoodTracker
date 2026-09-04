@@ -9,7 +9,7 @@ namespace FoodTracker
         public static void HandleDestroyedMeal(IngestionState state)
         {
             // Validate inputs
-            if (state == null || state.Pawn == null || state.FoodDef == null)
+            if (state == null || state.Pawn == null || state.PreFood == null || state.PreFood.Destroyed)
             {
                 Log.Warning($"[FoodTracker][T{state?.TraceID.ToString() ?? "?"}] Inputs are not valid. State Null: {state == null} " +
                     $"| Pawn Null: {state?.Pawn == null} | ThingDef Null: {state?.FoodDef == null}");
@@ -21,42 +21,6 @@ namespace FoodTracker
             float exactItemsEaten = nutritionEaten / state.NutritionPerItem;
             float nutritionIntoPartial = ((state.TotalNutrition - nutritionEaten) % state.NutritionPerItem);
             int itemsRemoved = Mathf.CeilToInt(exactItemsEaten);
-
-            // Get map of pawn which is where destroyedFood resided before destruction.
-            Map map = state.Pawn.Map;
-
-            if (map == null || !state.FoodCell.IsValid)
-            {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Invalid map or food cell. Map Null: {map == null} | Food Cell Invalid: {!state.FoodCell.IsValid}");
-
-                return;
-            }
-
-            // Initializing item stack where destroyedFood resided before eating.
-            Thing survivingStack = null;
-
-            foreach (Thing thing in state.FoodCell.GetThingList(map))
-            {
-                if (thing == null || thing.Destroyed)
-                    continue;
-
-                if (thing.def != state.FoodDef)
-                    continue;
-
-                if (!thing.def.IsNutritionGivingIngestible)
-                    continue;
-
-                // Store the leftover stack
-                survivingStack = thing;
-                break;
-            }
-
-            if (survivingStack == null)
-            {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Could not find a surviving {state?.FoodDef?.defName ?? "NULL"} (ID {state?.PostFood?.thingIDNumber ?? 0}) stack at {state.FoodCell}.");
-
-                return;
-            }
 
             // Create the partial meal and drop at specified cell
             Thing partialMeal = PartialMealFactory.CreateAndDropPartialMeal(state, nutritionIntoPartial, state.FoodCell);
@@ -70,30 +34,32 @@ namespace FoodTracker
                 itemsRemoved--;
 
                 // If items to be removed equal or exceed the stack count then set the Thing for destruction.
-                if (itemsRemoved >= survivingStack.stackCount)
+                if (itemsRemoved >= state.PreFood.stackCount)
                 {
-                    state.ThingsToDestroy.Add(survivingStack);
+                    state.ThingsToDestroy.Add(state.PreFood);
                     state.DestroyFoodAfterIngestion = true;
                 }
+                // Otherwise stubtract items to remove from the stack count.
                 else
-                    survivingStack.stackCount -= itemsRemoved;
+                {
+                    state.PreFood.stackCount -= itemsRemoved;
+                }
 
                 // Give the pawn and its records exactly the amount removed from the food.
                 FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionCorrection);
 
                 return;
             }
-
             // Remove the consumed physical meals from the stack.
-            if (itemsRemoved >= survivingStack.stackCount)
+            if (itemsRemoved >= state.PreFood.stackCount)
             {
-                state.ThingsToDestroy.Add(survivingStack);
+                state.ThingsToDestroy.Add(state.PreFood);
                 state.DestroyFoodAfterIngestion = true;
             }
             // Otherwise stubtract items to remove from the stack count.
             else
             {
-                survivingStack.stackCount -= itemsRemoved;
+                state.PreFood.stackCount -= itemsRemoved;
             }
 
             if (FoodTrackerSettings.Verbose)
@@ -111,7 +77,7 @@ namespace FoodTracker
         public static void HandleDestroyedFoodTrackerMeal(IngestionState state)
         {
             // Validate inputs
-            if (state == null || state.Pawn == null || state.FoodDef == null)
+            if (state == null || state.Pawn == null || state.PreFood == null || state.PreFood.Destroyed)
             {
                 Log.Warning($"[FoodTracker][T{state?.TraceID.ToString() ?? "?"}] Inputs are not valid. State Null: {state == null} " +
                     $"| Pawn Null: {state?.Pawn == null} | ThingDef Null: {state?.FoodDef == null}");
@@ -119,43 +85,7 @@ namespace FoodTracker
                 return;
             }
 
-            // Get map of pawn which is where destroyedFood resided before destruction.
-            Map map = state.Pawn.Map;
-
-            if (map == null || !state.FoodCell.IsValid)
-            {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Invalid map or food cell. Map Null: {map == null} | Food Cell Invalid: {!state.FoodCell.IsValid}");
-
-                return;
-            }
-
-            // Initializing item stack where destroyedFood resided before eating.
-            Thing survivingStack = null;
-
-            foreach (Thing thing in state.FoodCell.GetThingList(map))
-            {
-                if (thing == null || thing.Destroyed)
-                    continue;
-
-                if (thing.def != state.FoodDef)
-                    continue;
-
-                if (!thing.def.IsNutritionGivingIngestible)
-                    continue;
-
-                // Store the leftover stack
-                survivingStack = thing;
-                break;
-            }
-
-            if (survivingStack == null)
-            {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Could not find a surviving {state?.FoodDef?.defName ?? "NULL"} (ID {state?.PostFood?.thingIDNumber ?? 0}) stack at {state.FoodCell}.");
-
-                return;
-            }
-
-            CompFoodTracker tracker = survivingStack.TryGetComp<CompFoodTracker>();
+            CompFoodTracker tracker = state.PreFood.TryGetComp<CompFoodTracker>();
 
             // Calculate nutrition eaten.
             float nutritionEaten = state.TotalNutrition * state.EatenFraction;
@@ -217,15 +147,15 @@ namespace FoodTracker
             }
 
             // If items to be removed equal or exceed the stack count then set the Thing for destruction.
-            if (itemsRemoved >= survivingStack.stackCount)
+            if (itemsRemoved >= state.PreFood.stackCount)
             {
-                state.ThingsToDestroy.Add(survivingStack);
+                state.ThingsToDestroy.Add(state.PreFood);
                 state.DestroyFoodAfterIngestion = true;
             }
             // Otherwise stubtract items to remove from the stack count.
             else
             {
-                survivingStack.stackCount -= itemsRemoved;
+                state.PreFood.stackCount -= itemsRemoved;
             }
 
             if (FoodTrackerSettings.Verbose)
