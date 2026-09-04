@@ -143,8 +143,8 @@ namespace FoodTracker
             if (FoodTrackerSettings.Verbose)
                 Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state.PostFood.thingIDNumber}) " +
                     $"| Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
-                    $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} | Total Remaining: {(state.TotalNutrition - nutritionEaten):F2} " +
-                    $"| Partial Nutrition: {nutritionIntoPartial:F2} | Whole Items Remaining: {(state.IngestCount - itemsRemoved)}");
+                    $"| Total Consumed: {nutritionEaten:F2} | Partial Nutrition: {nutritionIntoPartial:F2} " +
+                    $"| Whole Items Remaining: {(state.IngestCount - itemsRemoved)}");
 
             // Create a new Thing to represent the new meal, and drop it in the world.
             Thing newFood = PartialMealFactory.CreateAndDropPartialMeal(state, nutritionIntoPartial, state.Pawn.Position);

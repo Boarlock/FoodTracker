@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Verse;
+using Verse.AI;
 
 namespace FoodTracker
 {
@@ -18,22 +19,21 @@ namespace FoodTracker
         public Thing PreFood;
         public Thing PostFood;
         public ThingDef FoodDef;
-        public ThingDef BaseDef;
         public ThingDef TrackerDef;
         public int IngestCount;
         public int PreStackCount;
-        public int PostStackCount;
         public float TotalNutrition;
         public float NutritionPerItem;
 
         // Captured after vanilla initializes the toil.
+        public int StartTick;
         public int TotalTicks;
         public float HungerAtStart;
         public IntVec3 FoodCell;
 
         // Runtime state.
+        public JobCondition EndCondition;
         public float EatenFraction;
-        public bool Finalized;
         public bool DestroyFoodAfterIngestion;
     }
 
