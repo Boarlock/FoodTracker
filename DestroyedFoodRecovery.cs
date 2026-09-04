@@ -22,14 +22,36 @@ namespace FoodTracker
             float nutritionIntoPartial = ((state.TotalNutrition - nutritionEaten) % state.NutritionPerItem);
             int itemsRemoved = Mathf.CeilToInt(exactItemsEaten);
 
+            // If nutrition is below a meaningful amount we don't even track it.
+            if (nutritionIntoPartial < FoodTrackingHelpers.MinimumPartialNutrition)
+            {
+
+                // If items to be removed equal or exceed the stack count then set the Thing for destruction.
+                if (itemsRemoved >= state.PostFood.stackCount)
+                {
+                    state.ThingsToDestroy.Add(state.PostFood);
+                    state.DestroyFoodAfterIngestion = true;
+                }
+                // Otherwise stubtract items to remove from the stack count.
+                else
+                {
+                    state.PostFood.stackCount -= itemsRemoved;
+                }
+
+                // Give the pawn and its records exactly the amount removed from the food.
+                FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
+
+                return;
+            }
+
             // Create the partial meal and drop at specified cell
             Thing partialMeal = PartialMealFactory.CreateAndDropPartialMeal(state, nutritionIntoPartial, state.FoodCell);
 
+            // If failed to create a partial meal then remove one from items to remove and correct nutrition to give to pawn.
             if (partialMeal == null)
             {
                 Log.Warning($"[FoodTracker][T{state.TraceID}] Failed to make {partialMeal?.def.defName ?? "NULL"} (ID {partialMeal?.thingIDNumber ?? 0})");
 
-                // If failed to create a partial meal then remove one from items to remove and correct nutrition to give to pawn.
                 float nutritionCorrection = itemsRemoved * state.NutritionPerItem;
                 itemsRemoved--;
 
@@ -104,13 +126,31 @@ namespace FoodTracker
                 else
                     nextItem = tracker.PartialNutrition;
 
+                // If the next item is greater than nutrition remainder.
                 if (nutritionRemainder < nextItem)
                 {
-                    // Set either the singleton or the next item in the list with the remaining nutrition.
+                    // Calculate the remaining nutrition in the partial.
+                    float nutritionRemaining = nextItem - nutritionRemainder;
+
+                    // If nutrition is less than a meaningfull amount then consider fully consumed.
+                    if (nutritionRemaining < FoodTrackingHelpers.MinimumPartialNutrition)
+                    {
+                        nutritionRemainder = 0f;
+                        itemsRemoved++;
+
+                        // Set either the singleton or the next item in the list with the remaining nutrition.
+                        if (state.NutritionEntriesBefore.Count > 0)
+                            state.NutritionEntriesBefore.RemoveAt(0);
+                        else
+                            tracker.PartialNutrition = 0f;
+
+                        break;
+                    }
+                    // Otherwise preserve the remaining nutrition.
                     if (state.NutritionEntriesBefore.Count > 0)
-                        state.NutritionEntriesBefore[0] = nextItem - nutritionRemainder;
+                        state.NutritionEntriesBefore[0] = nutritionRemaining;
                     else
-                        tracker.PartialNutrition = nextItem - nutritionRemainder;
+                        tracker.PartialNutrition = nutritionRemaining;
 
                     break;
                 }
@@ -126,14 +166,8 @@ namespace FoodTracker
             {
                 tracker.NutritionEntries.Clear();
             }
-            // If the list has one item this sets the partial nutrition and clears it.
-            else if (state.NutritionEntriesBefore.Count == 1)
-            {
-                tracker.PartialNutrition = state.NutritionEntriesBefore[0];
-                tracker.NutritionEntries.Clear();
-            }
-            // If the ingest job was only one then only one partial meal can exist.
-            else if (state.IngestCount == 1)
+            // If the list has one item this sets the partial nutrition and clears it or if the ingest job was only one then only one partial meal can exist..
+            else if (state.NutritionEntriesBefore.Count == 1 || state.IngestCount == 1)
             {
                 tracker.PartialNutrition = state.NutritionEntriesBefore[0];
                 tracker.NutritionEntries.Clear();

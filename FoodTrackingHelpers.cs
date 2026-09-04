@@ -7,6 +7,8 @@ namespace FoodTracker
     public static class FoodTrackingHelpers
 
     {
+        // Amount of nutrition this mod considers irrelevant and therefore doesn't track.
+        public const float MinimumPartialNutrition = 0.01f;
 
         // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
         public static ThingDef GetOriginalMealDef(ThingDef mealDef)
