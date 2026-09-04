@@ -28,28 +28,6 @@ namespace FoodTracker
             return DefDatabase<ThingDef>.GetNamedSilentFail(originalDefName);
         }
 
-        // If pawn is not human and food doesn't give nutrition then we don't run FoodTracker
-        public static bool ValidateFoodEatingAttempt(Pawn pawn, Thing food)
-        {
-
-            if (pawn == null || food == null || food.Destroyed)
-            {
-                if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker] Inputs are not valid. Pawn Null: {pawn == null} | Food Null: {food == null} " +
-                        $"| Food Destroyed: {food?.Destroyed ?? false}");
-
-                return false;
-            }
-
-            if (!pawn.RaceProps.Humanlike)
-                return false;
-
-            if (!food.def.IsNutritionGivingIngestible)
-                return false;
-
-            return true;
-        }
-
         // Method to check pawn and nutrition for invalid values, and apply nutrition to pawn.
         public static void ApplyNutritionToPawn(IngestionState state, float nutrition)
         {

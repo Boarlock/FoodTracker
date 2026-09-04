@@ -45,8 +45,7 @@ namespace FoodTracker
 
             RegisterGeneratedThingDef(childDef, loadingFromSave);
 
-            // Do not touch the GameComponent while it is currently
-            // being loaded from the save.
+            // Do not touch the GameComponent while it is currently being loaded from the save.
             if (!loadingFromSave)
             {
                 FoodTrackerGameComponent component = Current.Game.GetComponent<FoodTrackerGameComponent>();
@@ -61,6 +60,7 @@ namespace FoodTracker
             return childDef;
         }
 
+        // Everything needed to resolve references, short hash, adding the def to the database, and repopulating ThingCategory's
         private static void RegisterGeneratedThingDef(ThingDef childDef, bool loadingFromSave)
         {
             childDef.shortHash = 0;
@@ -69,6 +69,9 @@ namespace FoodTracker
             childDef.generated = true;
 
             DefDatabase<ThingDef>.Add(childDef);
+
+            AssignShortHash(childDef);
+            DefDatabase<ThingDef>.InitializeShortHashDictionary();
 
             foreach (ThingCategoryDef category in childDef.thingCategories)
             {
@@ -80,6 +83,35 @@ namespace FoodTracker
 
             if (!loadingFromSave)
                 ResourceCounter.ResetDefs();
+        }
+
+        // Reproducing vanilla's exact short has algorithm
+        private static void AssignShortHash(ThingDef def)
+        {
+            HashSet<ushort> takenHashes = new HashSet<ushort>();
+
+            foreach (ThingDef existingDef in DefDatabase<ThingDef>.AllDefs)
+            {
+                if (existingDef == def)
+                    continue;
+
+                if (existingDef.shortHash != 0)
+                    takenHashes.Add(existingDef.shortHash);
+            }
+
+            ushort hash = (ushort)(GenText.StableStringHash(def.defName) % 65535);
+            int attempts = 0;
+
+            while (hash == 0 || takenHashes.Contains(hash))
+            {
+                hash++;
+                attempts++;
+
+                if (attempts > 5000)
+                    Log.Message("[FoodTracker] Short hashes are saturated. There are probably too many ThingDefs.");
+            }
+
+            def.shortHash = hash;
         }
     }
 }

@@ -23,8 +23,7 @@ namespace FoodTracker
             Thing food = curJob?.GetTarget(ingestibleInd).Thing;
             ThingDef trackerDef = DynamicMealDefFactory.CreateTrackerMeal(food.def);
 
-            // Validate pawn is human and not null and food gives nutrition and not null.
-            if (!FoodTrackingHelpers.ValidateFoodEatingAttempt(chewer, food))
+            if (food == null || chewer == null)
                 return;
 
             // Get the FoodTracker and Ingredients components if they exist.
