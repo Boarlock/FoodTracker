@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using Verse;
+using static FoodTracker.FoodTrackerDrugEffects;
 
 namespace FoodTracker
 {
@@ -82,6 +83,14 @@ namespace FoodTracker
             else
             {
                 state.PreFood.stackCount -= itemsRemoved;
+            }
+
+            // If ingested item is a supported drug type.
+            if (state.IsDrug)
+            {
+                FoodTrackerDrugType drugType = FoodTrackingHelpers.GetDrugType(state.BaseDef);
+
+                ApplyIngestionEffects(state.Pawn, state.EatenFraction, drugType, state.BaseDef);
             }
 
             if (FoodTrackerSettings.Verbose)
@@ -189,6 +198,14 @@ namespace FoodTracker
             else
             {
                 state.PreFood.stackCount -= itemsRemoved;
+            }
+
+            // If ingested item is a supported drug type.
+            if (state.IsDrug)
+            {
+                FoodTrackerDrugType drugType = FoodTrackingHelpers.GetDrugType(state.BaseDef);
+
+                ApplyIngestionEffects(state.Pawn, state.EatenFraction, drugType, state.BaseDef);
             }
 
             if (FoodTrackerSettings.Verbose)

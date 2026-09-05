@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using Verse;
+using static FoodTracker.FoodTrackerDrugEffects;
 
 namespace FoodTracker
 {
@@ -131,6 +132,14 @@ namespace FoodTracker
                     state.PostFood.stackCount -= itemsRemoved;
                 }
 
+                // If ingested item is a supported drug type.
+                if(state.IsDrug)
+                {
+                    FoodTrackerDrugType drugType = FoodTrackingHelpers.GetDrugType(state.BaseDef);
+
+                    ApplyIngestionEffects(state.Pawn, state.EatenFraction, drugType, state.BaseDef);
+                }
+
                 if (FoodTrackerSettings.Verbose)
                     Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state.PostFood.thingIDNumber}) " +
                         $"| Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
@@ -218,6 +227,14 @@ namespace FoodTracker
             else
             {
                 state.PostFood.stackCount -= itemsRemoved;
+            }
+
+            // If ingested item is a supported drug type.
+            if (state.IsDrug)
+            {
+                FoodTrackerDrugType drugType = FoodTrackingHelpers.GetDrugType(state.BaseDef);
+
+                ApplyIngestionEffects(state.Pawn, state.EatenFraction, drugType, state.BaseDef);
             }
 
             // Give the pawn and its records exactly the amount removed from the food.

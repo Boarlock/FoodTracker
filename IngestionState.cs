@@ -16,9 +16,11 @@ namespace FoodTracker
 
         // Captured during Prefix while the Food Thing is still reliable.
         public Pawn Pawn;
+        public bool IsDrug;
         public Thing PreFood;
         public Thing PostFood;
         public ThingDef FoodDef;
+        public ThingDef BaseDef;
         public ThingDef TrackerDef;
         public int IngestCount;
         public int PreStackCount;

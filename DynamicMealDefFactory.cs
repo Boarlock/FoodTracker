@@ -1,6 +1,7 @@
 ﻿using RimWorld;
 using System.Collections.Generic;
 using System.Reflection.Emit;
+using System.Xml;
 using Verse;
 
 namespace FoodTracker
@@ -43,7 +44,7 @@ namespace FoodTracker
 
             childDef.comps.Add(new CompProperties_FoodTracker());
 
-            RegisterGeneratedThingDef(childDef, loadingFromSave);
+            RegisterGeneratedThingDef(childDef);
 
             // Do not touch the GameComponent while it is currently being loaded from the save.
             if (!loadingFromSave)
@@ -61,7 +62,7 @@ namespace FoodTracker
         }
 
         // Everything needed to resolve references, short hash, adding the def to the database, and repopulating ThingCategory's
-        private static void RegisterGeneratedThingDef(ThingDef childDef, bool loadingFromSave)
+        private static void RegisterGeneratedThingDef(ThingDef childDef)
         {
             childDef.shortHash = 0;
             childDef.ResolveDefNameHash();
@@ -73,16 +74,17 @@ namespace FoodTracker
             AssignShortHash(childDef);
             DefDatabase<ThingDef>.InitializeShortHashDictionary();
 
+            // Re-generate Thing categorys and resolve references after each.
             foreach (ThingCategoryDef category in childDef.thingCategories)
             {
                 if (!category.childThingDefs.Contains(childDef))
-                category.childThingDefs.Add(childDef);
+                    category.childThingDefs.Add(childDef);
 
                 category.ResolveReferences();
             }
-
-            if (!loadingFromSave)
-                ResourceCounter.ResetDefs();
+            
+            // Update resource center with the new def.
+            ResourceCounter.ResetDefs();
         }
 
         // Reproducing vanilla's exact short has algorithm

@@ -10,6 +10,36 @@ namespace FoodTracker
         // Amount of nutrition this mod considers irrelevant and therefore doesn't track.
         public const float MinimumPartialNutrition = 0.01f;
 
+        public static FoodTrackerDrugEffects.FoodTrackerDrugType GetDrugType(ThingDef def)
+        {
+            if (def == null || def.ingestible == null)
+                return FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported;
+
+            switch (def.defName)
+            {
+                case "Ambrosia":
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.Ambrosia;
+
+                case "Beer":
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.Beer;
+
+                case "PsychiteTea":
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.PsychiteTea;
+
+                case "SmokeleafJoint":
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.Smokeleaf;
+
+                case "GoJuice":
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.GoJuice;
+
+                case "Flake":
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.Flake;
+
+                default:
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported;
+            }
+        }
+
         // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
         public static ThingDef GetOriginalMealDef(ThingDef mealDef)
         {

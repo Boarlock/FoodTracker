@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Verse;
 using Verse.AI;
+using static FoodTracker.FoodTrackingHelpers;
 
 namespace FoodTracker
 {
@@ -24,6 +25,9 @@ namespace FoodTracker
             ThingDef trackerDef = DynamicMealDefFactory.CreateTrackerMeal(food.def);
 
             if (food == null || chewer == null)
+                return;
+
+            if (!food.def.IsNutritionGivingIngestible && FoodTrackingHelpers.GetDrugType(food.def) == FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported)
                 return;
 
             // Get the FoodTracker and Ingredients components if they exist.
@@ -87,6 +91,8 @@ namespace FoodTracker
 
                 FoodDef = food.def, // The actual def of the food being eaten, which may be a FoodTracker ingest job.
 
+                BaseDef = GetOriginalMealDef(food.def), // We use normal meal defs for drug effect calculations.
+
                 PreStackCount = food.stackCount, // The stack count of the food when the job starts.
 
                 IngestCount = curJob.count, // The number of items the pawn is attempting to eat in this job.
@@ -99,6 +105,9 @@ namespace FoodTracker
 
                 IngredientsBefore = ingredientsBefore  // The ingredients of the food before ingestion, if it has a CompIngredients component.
             };
+
+            if (FoodTrackingHelpers.GetDrugType(food.def) != FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported)
+                __state.IsDrug = true;
 
             // Eating duration is based on the actual total nutrition being consumed.
             durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
