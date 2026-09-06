@@ -1,5 +1,7 @@
 ﻿using HarmonyLib;
 using RimWorld;
+using System;
+using System.Diagnostics;
 using System.Text;
 using Verse;
 using static FoodTracker.FoodTrackerDrugEffects;
@@ -14,10 +16,6 @@ namespace FoodTracker
         public static void Postfix(StatDrawEntry __instance, StatRequest optionalReq, ref string __result)
         {
 
-            // Only modify the Nutrition tooltip.
-            if (__instance.stat != StatDefOf.Nutrition)
-                return;
-
             if (optionalReq.Thing == null)
                 return;
 
@@ -31,51 +29,270 @@ namespace FoodTracker
             // Checking to see if it's a tracked food item or tracked drug item.
             if (FoodTrackingHelpers.GetDrugType(thing.def) == FoodTrackerDrugType.Unsupported)
             {
-                // Build the 'Base value: ' text on the GetExplanation screen and the default text that shows.
-                string descriptionBaseText = "How nutritious this food is.\n\nBase value: ";
-
-                // Get the base nutrition for the Thing and change it into our formatted string then append the descriptor base text.
-                float baseValue = optionalReq.Thing.GetStatValue(StatDefOf.Nutrition);
-                string baseValueString = baseValue.ToString("N2");
-                string baseFinal = descriptionBaseText + baseValueString + "\n\n";
-
-                // SINGLETON STATE
-                if (tracker.NutritionEntries.Count == 0)
+                // Modify the Nutrition tooltip.
+                if (__instance.stat == StatDefOf.Nutrition)
                 {
-                    string single = $"Final Value: {tracker.PartialNutrition:N2}";
-                    __result = baseFinal + single;
+                    float nutritionPerItem;
+                    float nutrition;
 
-                    return;
+                    // Build the 'Base value: ' text on the GetExplanation screen and the default text that shows.
+                    string descriptionBaseText = "How nutritious this food is.\n\nBase value: ";
+
+                    // Get the base nutrition for the Thing and change it into our formatted string then append the descriptor base text.
+                    float baseValue = thing.def.GetStatValueAbstract(StatDefOf.Nutrition);
+                    string baseValueString = baseValue.ToString("N2");
+                    string baseFinal = descriptionBaseText + baseValueString + "\n\n";
+
+                    // If tracked item is a singleton.
+                    if (tracker.RemainingFractions.Count == 0)
+                    {
+                        // Get the base nutrition per item, multiply that with tracked fraction.
+                        nutritionPerItem = thing.def.GetStatValueAbstract(StatDefOf.Nutrition);
+                        float totalFraction = tracker.PartialFraction;
+                        nutrition = totalFraction * nutritionPerItem;
+
+                        // Build "Final value: X" string.
+                        string single = $"Final Value: {nutrition:N2}";
+                        __result = baseFinal + single;
+
+                        return;
+                    }
+                    // If tracked item is a stack.
+                    else
+                    {
+                        // Get the base nutrition per item, and initialize string builder.
+                        nutritionPerItem = thing.def.GetStatValueAbstract(StatDefOf.Nutrition);
+                        StringBuilder mealList = new StringBuilder();
+                        float partialFraction = 0f;
+
+                        for (int i = 0; i < tracker.RemainingFractions.Count; i++)
+                        {
+                            partialFraction = tracker.RemainingFractions[i];
+                            nutrition = partialFraction * nutritionPerItem;
+
+                            mealList.AppendLine($"Item {i + 1}: {nutrition:0.00}");
+                        }
+
+                        __result = baseFinal + mealList.ToString();
+
+                        return;
+                    }
                 }
-
-                // STACK STATE
-                StringBuilder mealList = new StringBuilder();
-
-                for (int i = 0; i < tracker.NutritionEntries.Count; i++)
+                // If the player is looking at mass tooltip.
+                else if (__instance.stat == StatDefOf.Mass)
                 {
-                    mealList.AppendLine(
-                        $"Item {i + 1}: {tracker.NutritionEntries[i]:0.00}"
-                    );
-                }
+                    float massPerItem;
+                    float mass;
 
-                __result = baseFinal + mealList.ToString();
+                    // Build the 'Base value: ' text on the GetExplanation screen and the default text that shows.
+                    string descriptionBaseText = "The physical mass of an object or creature.\n\nBase value: ";
+
+                    // Get the base nutrition for the Thing and change it into our formatted string then append the descriptor base text.
+                    float baseValue = thing.def.GetStatValueAbstract(StatDefOf.Mass);
+                    string baseValueString = baseValue.ToString("N2");
+                    string baseFinal = descriptionBaseText + baseValueString + " kg\n\n";
+
+                    // If tracked item is a singleton.
+                    if (tracker.RemainingFractions.Count == 0)
+                    {
+                        // Get the base nutrition per item, multiply that with tracked fraction.
+                        massPerItem = thing.def.GetStatValueAbstract(StatDefOf.Mass);
+                        float totalFraction = tracker.PartialFraction;
+                        mass = totalFraction * massPerItem;
+
+                        // Build "Final value: X" string.
+                        string single = $"Final Value: {mass:N2} kg";
+                        __result = baseFinal + single;
+
+                        return;
+                    }
+                    // If tracked item is a stack.
+                    else
+                    {
+                        // Get the base nutrition per item, and initialize string builder.
+                        massPerItem = thing.def.GetStatValueAbstract(StatDefOf.Mass);
+                        StringBuilder mealList = new StringBuilder();
+                        float partialFraction = 0f;
+
+                        for (int i = 0; i < tracker.RemainingFractions.Count; i++)
+                        {
+                            partialFraction = tracker.RemainingFractions[i];
+                            mass = partialFraction * massPerItem;
+
+                            mealList.AppendLine($"Item {i + 1}: {mass:0.00} kg");
+                        }
+
+                        __result = baseFinal + mealList.ToString();
+
+                        return;
+                    }
+                }
+                // If the player is looking at market value tooltip.
+                else if (__instance.stat == StatDefOf.MarketValue)
+                {
+                    float valuePerItem;
+                    float value;
+
+                    // Build the 'Base value: ' text on the GetExplanation screen and the default text that shows.
+                    string descriptionBaseText = "The market value of an object.\n\nThe actual trade price will be adjusted by negotiation skill, " +
+                        "relationship status, and other contextual factors.\n\nBase value: $";
+
+                    // Get the base nutrition for the Thing and change it into our formatted string then append the descriptor base text.
+                    float baseValue = thing.def.GetStatValueAbstract(StatDefOf.MarketValue);
+                    string baseValueString = baseValue.ToString("N2");
+                    string baseFinal = descriptionBaseText + baseValueString + "\n\n";
+
+                    // If tracked item is a singleton.
+                    if (tracker.RemainingFractions.Count == 0)
+                    {
+                        // Get the base nutrition per item, multiply that with tracked fraction.
+                        valuePerItem = thing.def.GetStatValueAbstract(StatDefOf.MarketValue);
+                        float totalFraction = tracker.PartialFraction;
+                        value = totalFraction * valuePerItem;
+
+                        // Build "Final value: X" string.
+                        string single = $"Final Value: ${value:N2}";
+                        __result = baseFinal + single;
+
+                        return;
+                    }
+                    // If tracked item is a stack.
+                    else
+                    {
+                        // Get the base nutrition per item, and initialize string builder.
+                        valuePerItem = thing.def.GetStatValueAbstract(StatDefOf.MarketValue);
+                        StringBuilder mealList = new StringBuilder();
+                        float partialFraction = 0f;
+
+                        for (int i = 0; i < tracker.RemainingFractions.Count; i++)
+                        {
+                            partialFraction = tracker.RemainingFractions[i];
+                            value = partialFraction * valuePerItem;
+
+                            mealList.AppendLine($"Item {i + 1}: ${value:0.00}");
+                        }
+
+                        __result = baseFinal + mealList.ToString();
+
+                        return;
+                    }
+                }
             }
+            // It is a tracked item but not a food item.
             else
             {
+                // If the player is looking at mass tooltip.
+                if (__instance.stat == StatDefOf.Mass)
+                {
+                    float massPerItem;
+                    float mass;
 
+                    // Build the 'Base value: ' text on the GetExplanation screen and the default text that shows.
+                    string descriptionBaseText = "The physical mass of an object or creature.\n\nBase value: ";
+
+                    // Get the base nutrition for the Thing and change it into our formatted string then append the descriptor base text.
+                    float baseValue = thing.def.GetStatValueAbstract(StatDefOf.Mass);
+                    string baseValueString = baseValue.ToString("N2");
+                    string baseFinal = descriptionBaseText + baseValueString + " kg\n\n";
+
+                    // If tracked item is a singleton.
+                    if (tracker.RemainingFractions.Count == 0)
+                    {
+                        // Get the base nutrition per item, multiply that with tracked fraction.
+                        massPerItem = thing.def.GetStatValueAbstract(StatDefOf.Mass);
+                        float totalFraction = tracker.PartialFraction;
+                        mass = totalFraction * massPerItem;
+
+                        // Build "Final value: X" string.
+                        string single = $"Final Value: {mass:N2} kg";
+                        __result = baseFinal + single;
+
+                        return;
+                    }
+                    // If tracked item is a stack.
+                    else
+                    {
+                        // Get the base nutrition per item, and initialize string builder.
+                        massPerItem = thing.def.GetStatValueAbstract(StatDefOf.Mass);
+                        StringBuilder mealList = new StringBuilder();
+                        float partialFraction = 0f;
+
+                        for (int i = 0; i < tracker.RemainingFractions.Count; i++)
+                        {
+                            partialFraction = tracker.RemainingFractions[i];
+                            mass = partialFraction * massPerItem;
+
+                            mealList.AppendLine($"Item {i + 1}: {mass:0.00} kg");
+                        }
+
+                        __result = baseFinal + mealList.ToString();
+
+                        return;
+                    }
+                }
+                // If the player is looking at market value tooltip.
+                else if (__instance.stat == StatDefOf.MarketValue)
+                {
+                    float valuePerItem;
+                    float value;
+
+                    // Build the 'Base value: ' text on the GetExplanation screen and the default text that shows.
+                    string descriptionBaseText = "The market value of an object.\n\nThe actual trade price will be adjusted by negotiation skill, " +
+                        "relationship status, and other contextual factors.\n\nBase value: $";
+
+                    // Get the base nutrition for the Thing and change it into our formatted string then append the descriptor base text.
+                    float baseValue = thing.def.GetStatValueAbstract(StatDefOf.MarketValue);
+                    string baseValueString = baseValue.ToString("N2");
+                    string baseFinal = descriptionBaseText + baseValueString + "\n\n";
+
+                    // If tracked item is a singleton.
+                    if (tracker.RemainingFractions.Count == 0)
+                    {
+                        // Get the base nutrition per item, multiply that with tracked fraction.
+                        valuePerItem = thing.def.GetStatValueAbstract(StatDefOf.MarketValue);
+                        float totalFraction = tracker.PartialFraction;
+                        value = totalFraction * valuePerItem;
+
+                        // Build "Final value: X" string.
+                        string single = $"Final Value: ${value:N2}";
+                        __result = baseFinal + single;
+
+                        return;
+                    }
+                    // If tracked item is a stack.
+                    else
+                    {
+                        // Get the base nutrition per item, and initialize string builder.
+                        valuePerItem = thing.def.GetStatValueAbstract(StatDefOf.MarketValue);
+                        StringBuilder mealList = new StringBuilder();
+                        float partialFraction = 0f;
+
+                        for (int i = 0; i < tracker.RemainingFractions.Count; i++)
+                        {
+                            partialFraction = tracker.RemainingFractions[i];
+                            value = partialFraction * valuePerItem;
+
+                            mealList.AppendLine($"Item {i + 1}: ${value:0.00}");
+                        }
+
+                        __result = baseFinal + mealList.ToString();
+
+                        return;
+                    }
+                }
             }
         }
     }
 
     [HarmonyPatch(typeof(StatWorker), nameof(StatWorker.GetStatDrawEntryLabel))]
 
-    // Patch for the left side of the inspect screen so it displays either the single nutrition value for singletons or the cumulative nutrition value of a stack of partials.
+    // Patch for the left side of the inspect screen so it displays the actual nutrition, mass, or market value represented by the tracked fractions.
     public static class GetStatDrawEntryLabelPatch
     {
         public static bool Prefix(StatDef stat, ToStringNumberSense numberSense, StatRequest optionalReq, bool finalized, ref string __result)
         {
-
-            if (stat != StatDefOf.Nutrition)
+            // Only modify Nutrition, Mass, and Market Value.
+            if (stat != StatDefOf.Nutrition && stat != StatDefOf.Mass && stat != StatDefOf.MarketValue)
                 return true;
 
             if (!optionalReq.HasThing)
@@ -88,32 +305,35 @@ namespace FoodTracker
             if (tracker == null)
                 return true;
 
-            // Checking to see if it's a tracked food item or tracked drug item.
-            if (FoodTrackingHelpers.GetDrugType(thing.def) == FoodTrackerDrugType.Unsupported)
+            // Tracked drugs don't have a Nutrition stat.
+            if (stat == StatDefOf.Nutrition &&
+                FoodTrackingHelpers.GetDrugType(thing.def) != FoodTrackerDrugType.Unsupported)
+                return true;
+
+            // Get the total normalized fraction represented by this Thing.
+            float totalFraction;
+
+            // Singleton item.
+            if (tracker.RemainingFractions.Count == 0)
             {
-                float nutrition;
+                totalFraction = tracker.PartialFraction;
+            }
+            // Stack item.
+            else
+            {
+                totalFraction = 0f;
 
-                // Singleton FT meal.
-                if (tracker.NutritionEntries.Count == 0)
-                {
-                    nutrition = tracker.PartialNutrition;
-                }
-
-                // Stack FT meal.
-                else
-                {
-                    nutrition = 0f;
-
-                    for (int i = 0; i < tracker.NutritionEntries.Count; i++)
-                        nutrition += tracker.NutritionEntries[i];
-                }
-
-                __result = stat.ValueToString(nutrition, numberSense, finalized);
-
-                return false;
+                for (int i = 0; i < tracker.RemainingFractions.Count; i++)
+                    totalFraction += tracker.RemainingFractions[i];
             }
 
-            return true;
+            // Convert the normalized fraction into the actual physical stat value.
+            float baseValue = thing.def.GetStatValueAbstract(stat);
+            float finalValue = totalFraction * baseValue;
+
+            __result = stat.ValueToString(finalValue, numberSense, finalized);
+
+            return false;
         }
     }
 }

@@ -11,22 +11,21 @@ namespace FoodTracker
         // Internal ID to track each ingestion.
         public int TraceID;
         public bool HandlingInterruption;
-        public List<float> NutritionEntriesBefore;
+        public List<float> RemainingFractionsBefore;
         public List<ThingDef> IngredientsBefore;
         public List<Thing> ThingsToDestroy = new List<Thing>();
 
         // Captured during Prefix while the Food Thing is still reliable.
         public Pawn Pawn;
         public bool IsDrug;
-        public Thing PreFood;
-        public Thing PostFood;
-        public ThingDef FoodDef;
-        public ThingDef BaseDef;
-        public ThingDef TrackerDef;
+        public Thing PreIngestObject;
+        public Thing PostIngestObject;
+        public ThingDef ObjectDef;
+        public ThingDef ObjectGameDef;
+        public ThingDef ObjectTrackerDef;
         public int IngestCount;
         public int PreStackCount;
-        public float TotalNutrition;
-        public float NutritionPerItem;
+        public float TotalFraction;
 
         // Captured after vanilla initializes the toil.
         public int StartTick;
@@ -36,7 +35,7 @@ namespace FoodTracker
 
         // Runtime state.
         public JobCondition EndCondition;
-        public float EatenFraction;
+        public float IngestedFraction;
         public bool DestroyFoodAfterIngestion;
     }
 

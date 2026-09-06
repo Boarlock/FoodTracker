@@ -46,7 +46,7 @@ namespace FoodTracker
             if (count >= __instance.stackCount)
                 return;
 
-            if (sourceTracker.NutritionEntries == null)
+            if (sourceTracker.RemainingFractions == null)
                 return;
 
             __state = new SplitOffState
@@ -55,8 +55,8 @@ namespace FoodTracker
                 SourceTracker = sourceTracker,
                 SourceStackBefore = __instance.stackCount,
 
-                SourceNutritionHistory = new List<float>(sourceTracker.NutritionEntries),
-                SourcePartialNutrition = sourceTracker.PartialNutrition
+                SourceNutritionHistory = new List<float>(sourceTracker.RemainingFractions),
+                SourcePartialNutrition = sourceTracker.PartialFraction
             };
 
             FoodTrackerStackOperations.SplitInProgress = true;
@@ -91,8 +91,8 @@ namespace FoodTracker
                 
                 int diff = Math.Abs(__state.SourceStackBefore - __instance.stackCount);
 
-                resultNutritionHistory = new List<float>(resultTracker.NutritionEntries);
-                resultPartialNutrition = resultTracker.PartialNutrition;
+                resultNutritionHistory = new List<float>(resultTracker.RemainingFractions);
+                resultPartialNutrition = resultTracker.PartialFraction;
 
                 // Setting result to singleton mode, if result is stack count of 1.
                 if (__result.stackCount == 1)
@@ -137,11 +137,11 @@ namespace FoodTracker
             finally
             {
 
-                resultTracker.NutritionEntries = resultNutritionHistory;
-                resultTracker.PartialNutrition = resultPartialNutrition;
+                resultTracker.RemainingFractions = resultNutritionHistory;
+                resultTracker.PartialFraction = resultPartialNutrition;
 
-                __state.SourceTracker.NutritionEntries = __state.SourceNutritionHistory;
-                __state.SourceTracker.PartialNutrition = __state.SourcePartialNutrition;
+                __state.SourceTracker.RemainingFractions = __state.SourceNutritionHistory;
+                __state.SourceTracker.PartialFraction = __state.SourcePartialNutrition;
 
                 FoodTrackerStackOperations.SplitInProgress = false;
             }
@@ -183,7 +183,7 @@ namespace FoodTracker
             if (targetTracker == null || sourceTracker == null)
                 return;
 
-            if (targetTracker.NutritionEntries == null || sourceTracker.NutritionEntries == null)
+            if (targetTracker.RemainingFractions == null || sourceTracker.RemainingFractions == null)
                 return;
 
             __state = new StackMergeState
@@ -194,11 +194,11 @@ namespace FoodTracker
                 TargetStackBefore = __instance.stackCount,
                 SourceStackBefore = other.stackCount,
 
-                TargetNutritionHistory = new List<float>(targetTracker.NutritionEntries),
-                SourceNutritionHistory = new List<float>(sourceTracker.NutritionEntries),
+                TargetNutritionHistory = new List<float>(targetTracker.RemainingFractions),
+                SourceNutritionHistory = new List<float>(sourceTracker.RemainingFractions),
 
-                TargetPartialNutrition = targetTracker.PartialNutrition,
-                SourcePartialNutrition = sourceTracker.PartialNutrition
+                TargetPartialNutrition = targetTracker.PartialFraction,
+                SourcePartialNutrition = sourceTracker.PartialFraction
             };
 
             FoodTrackerStackOperations.MergeInProgress = true;
@@ -481,14 +481,14 @@ namespace FoodTracker
 
                 if (__state != null)
                 {
-                    __state.TargetTracker.NutritionEntries.Clear();
-                    __state.TargetTracker.NutritionEntries.AddRange(__state.TargetNutritionHistory);
+                    __state.TargetTracker.RemainingFractions.Clear();
+                    __state.TargetTracker.RemainingFractions.AddRange(__state.TargetNutritionHistory);
 
-                    __state.SourceTracker.NutritionEntries.Clear();
-                    __state.SourceTracker.NutritionEntries.AddRange(__state.SourceNutritionHistory);
+                    __state.SourceTracker.RemainingFractions.Clear();
+                    __state.SourceTracker.RemainingFractions.AddRange(__state.SourceNutritionHistory);
 
-                    __state.TargetTracker.PartialNutrition = __state.TargetPartialNutrition;
-                    __state.SourceTracker.PartialNutrition = __state.SourcePartialNutrition;
+                    __state.TargetTracker.PartialFraction = __state.TargetPartialNutrition;
+                    __state.SourceTracker.PartialFraction = __state.SourcePartialNutrition;
                 }
 
                 ValidateTrackerState(__instance, __state.TargetTracker);
@@ -504,14 +504,14 @@ namespace FoodTracker
                 return;
 
             int stack = thing.stackCount;
-            int listCount = tracker.NutritionEntries.Count;
+            int listCount = tracker.RemainingFractions.Count;
 
             if (stack == 0)
             {
-                if (listCount != 0 || tracker.PartialNutrition >= 0f)
+                if (listCount != 0 || tracker.PartialFraction >= 0f)
                 {
                     Log.Warning($"[FoodTracker][VALIDATION] INVALID EMPTY STATE | Thing={thing.def.defName} " +
-                        $"ID={thing.thingIDNumber} Stack={stack} Partial={tracker.PartialNutrition} ListCount={listCount}"
+                        $"ID={thing.thingIDNumber} Stack={stack} Partial={tracker.PartialFraction} ListCount={listCount}"
                     );
                 }
 
@@ -520,10 +520,10 @@ namespace FoodTracker
 
             if (stack == 1)
             {
-                if (listCount != 0 || tracker.PartialNutrition < 0f)
+                if (listCount != 0 || tracker.PartialFraction < 0f)
                 {
                     Log.Warning($"[FoodTracker][VALIDATION] INVALID SINGLETON STATE | Thing={thing.def.defName} " +
-                        $"ID={thing.thingIDNumber} Stack={stack} Partial={tracker.PartialNutrition} ListCount={listCount}"
+                        $"ID={thing.thingIDNumber} Stack={stack} Partial={tracker.PartialFraction} ListCount={listCount}"
                     );
                 }
 
@@ -533,14 +533,14 @@ namespace FoodTracker
             if (listCount != stack)
             {
                 Log.Warning($"[FoodTracker][VALIDATION] INVALID STACK STATE | Thing={thing.def.defName} ID={thing.thingIDNumber} Stack={stack} " +
-                    $"Partial={tracker.PartialNutrition} ListCount={listCount} List=[{string.Join(", ", tracker.NutritionEntries)}]"
+                    $"Partial={tracker.PartialFraction} ListCount={listCount} List=[{string.Join(", ", tracker.RemainingFractions)}]"
                 );
             }
 
-            if (tracker.PartialNutrition >= 0f)
+            if (tracker.PartialFraction >= 0f)
             {
                 Log.Warning($"[FoodTracker][VALIDATION] MULTI-STACK HAS ACTIVE SINGLETON | Thing={thing.def.defName} " +
-                    $"ID={thing.thingIDNumber} Stack={stack} Partial={tracker.PartialNutrition} ListCount={listCount}"
+                    $"ID={thing.thingIDNumber} Stack={stack} Partial={tracker.PartialFraction} ListCount={listCount}"
                 );
             }
         }

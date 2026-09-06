@@ -10,20 +10,20 @@ namespace FoodTracker
         public static Thing CreateAndDropPartialMeal(IngestionState state, float remainingNutrition, IntVec3 dropCell)
         {
             // Validate the input parameters.
-            if (state == null || state.Pawn == null || state.PreFood == null)
+            if (state == null || state.Pawn == null || state.PreIngestObject == null)
             {
                 Log.Warning($"[FoodTracker][T{state?.TraceID.ToString() ?? "?"}] Inputs are not valid. State Null: {state == null} | Pawn Null: {state?.Pawn == null} " +
-                    $"| Food Null: {state?.PreFood == null}");
+                    $"| Food Null: {state?.PreIngestObject == null}");
 
                 return null;
             }
 
             // Try to get the partial meal definition corresponding to the vanilla meal. If no partial meal definition is found it returns.
-            ThingDef partialDef = state.TrackerDef;
+            ThingDef partialDef = state.ObjectTrackerDef;
 
             if (partialDef == null)
             {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] No corresponding partial meal found for {state.PreFood.def.defName} (ID {state.PreFood.thingIDNumber}).");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] No corresponding partial meal found for {state.PreIngestObject.def.defName} (ID {state.PreIngestObject.thingIDNumber}).");
 
                 return null;
             }
@@ -36,7 +36,7 @@ namespace FoodTracker
             // If created item doesn't for any reason contain our component then delete it.
             if (tracker == null && !partial.Destroyed)
             {
-                Log.Warning($"[FoodTracker][T{state.TraceID}] Component missing from {state.TrackerDef.defName} (ID {partial?.thingIDNumber ?? 0})");
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Component missing from {state.ObjectTrackerDef.defName} (ID {partial?.thingIDNumber ?? 0})");
 
                 state.ThingsToDestroy.Add(partial);
                 state.DestroyFoodAfterIngestion = true;
@@ -53,8 +53,8 @@ namespace FoodTracker
             }
 
             // Set the new food's Partial Nutrition component.
-            tracker.PartialNutrition = remainingNutrition;
-            tracker.NutritionEntries.Clear();
+            tracker.PartialFraction = remainingNutrition;
+            tracker.RemainingFractions.Clear();
 
             if (!GenDrop.TryDropSpawn(partial, dropCell, state.Pawn.Map, ThingPlaceMode.Near, out Thing resultingThing))
 

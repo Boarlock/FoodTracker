@@ -15,8 +15,8 @@ namespace FoodTracker
 
             if (tracker != null)
             {
-                tracker.NutritionEntries.Clear();
-                tracker.PartialNutrition = -1f;
+                tracker.RemainingFractions.Clear();
+                tracker.PartialFraction = -1f;
             }
 
             foreach (Thing thing in food) 

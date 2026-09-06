@@ -7,32 +7,32 @@ namespace FoodTracker
     public class CompFoodTracker : ThingComp
     {
         // Singleton state: The nutrition remaining in this individual meal. -1f means this Thing is currently in stack state.
-        private float nutritionThisMeal = -1f;
+        private float thisMealFraction = -1f;
 
         // Stack state: One nutrition value for each meal represented by the stack.
-        private List<float> nutritionEntries = new List<float>();
+        private List<float> remainingFractions = new List<float>();
 
-        public float PartialNutrition
+        public float PartialFraction
         {
             get
             {
-                return nutritionThisMeal;
+                return thisMealFraction;
             }
             set
             {
-                nutritionThisMeal = value;
+                thisMealFraction = value;
             }
         }
 
-        public List<float> NutritionEntries
+        public List<float> RemainingFractions
         {
             get
             {
-                return nutritionEntries;
+                return remainingFractions;
             }
             set
             {
-                nutritionEntries = value;
+                remainingFractions = value;
             }
         }
 
@@ -54,29 +54,29 @@ namespace FoodTracker
             // SINGLETON STATE
             if (parent.stackCount == 1)
             {
-                nutritionEntries.Clear();
+                remainingFractions.Clear();
 
-                if (nutritionThisMeal < 0f)
+                if (thisMealFraction < 0f)
                 {
-                    nutritionThisMeal = nutrition;
+                    thisMealFraction = nutrition;
                 }
 
                 return;
             }
 
             // STACK STATE
-            nutritionThisMeal = -1f;
+            thisMealFraction = -1f;
 
             // Existing per-item nutrition is already valid.
-            if (nutritionEntries.Count == parent.stackCount)
+            if (remainingFractions.Count == parent.stackCount)
                 return;
 
             // Otherwise initialize the stack.
-            nutritionEntries.Clear();
+            remainingFractions.Clear();
 
             for (int i = 0; i < parent.stackCount; i++)
             {
-                nutritionEntries.Add(nutrition);
+                remainingFractions.Add(nutrition);
             }
         }
 
@@ -84,13 +84,13 @@ namespace FoodTracker
         {
             base.PostExposeData();
 
-            Scribe_Values.Look(ref nutritionThisMeal, "nutritionThisMeal", -1f);
+            Scribe_Values.Look(ref thisMealFraction, "nutritionThisMeal", -1f);
 
-            Scribe_Collections.Look(ref nutritionEntries, "nutritionEntries", LookMode.Value);
+            Scribe_Collections.Look(ref remainingFractions, "nutritionEntries", LookMode.Value);
 
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
-                nutritionEntries ??= new List<float>();
+                remainingFractions ??= new List<float>();
             }
         }
     }

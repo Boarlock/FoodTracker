@@ -7,8 +7,8 @@ namespace FoodTracker
     public static class FoodTrackingHelpers
 
     {
-        // Amount of nutrition this mod considers irrelevant and therefore doesn't track.
-        public const float MinimumPartialNutrition = 0.01f;
+        // If fraction is below this value FT doesn't even track it.
+        public const float MinimumPartialFraction = 0.045f;
 
         public static FoodTrackerDrugEffects.FoodTrackerDrugType GetDrugType(ThingDef def)
         {
@@ -69,7 +69,7 @@ namespace FoodTracker
 
         public static float GetFoodTrackerNutritionValue(ThingDef def)
         {
-            ThingDef originalDef = GetOriginalMealDef(def);
+            ThingDef originalDef = GetOriginalDef(def);
 
             if (originalDef == null)
                 return 0f;
@@ -81,19 +81,19 @@ namespace FoodTracker
         }
 
         // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
-        public static ThingDef GetOriginalMealDef(ThingDef mealDef)
+        public static ThingDef GetOriginalDef(ThingDef objDef)
         {
-            if (mealDef == null)
+            if (objDef == null)
             {
-                Log.Warning($"[FoodTracker] Input is not valid. ThingDef Null: {mealDef == null}");
+                Log.Warning($"[FoodTracker] Input is not valid. ThingDef Null: {objDef == null}");
 
                 return null;
             }
 
-            if (!mealDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
-                return mealDef;
+            if (!objDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
+                return objDef;
 
-            string originalDefName = mealDef.defName[DynamicMealDefFactory.Prefix.Length..];
+            string originalDefName = objDef.defName[DynamicMealDefFactory.Prefix.Length..];
 
             return DefDatabase<ThingDef>.GetNamedSilentFail(originalDefName);
         }
