@@ -227,14 +227,12 @@ namespace FoodTracker
                 // Bootstrap any uninitialized singleton FT meals. This mirrors CompFoodTracker.PostSpawnSetup initialization.
                 if (__state.TargetNutritionHistory.Count == 0 && __state.TargetPartialNutrition < 0f)
                 {
-                    ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(__instance.def);
-                    __state.TargetPartialNutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
+                    __state.TargetPartialNutrition = FoodTrackingHelpers.GetFoodTrackerNutritionValue(__instance.def);
                 }
                 else if
                     (__state.SourceNutritionHistory.Count == 0 && __state.SourcePartialNutrition < 0f)
                 {
-                    ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(other.def);
-                    __state.SourcePartialNutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
+                    __state.SourcePartialNutrition = FoodTrackingHelpers.GetFoodTrackerNutritionValue(other.def);
                 }
 
                 // Stack merge case: If both stacks had more than one item, we need to append the NutritionEntries lists both ways..

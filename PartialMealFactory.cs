@@ -31,7 +31,6 @@ namespace FoodTracker
             // Create a new partial meal Thing using the partial meal definition and get the tracker comp for it.
             Thing partial = ThingMaker.MakeThing(partialDef);
 
-            // Check to see if the new partial meal has a CompFoodTracker component. If it doesn't, log a warning and destroy the partial meal.
             CompFoodTracker tracker = partial.TryGetComp<CompFoodTracker>();
 
             // If created item doesn't for any reason contain our component then delete it.
@@ -63,7 +62,7 @@ namespace FoodTracker
                 Log.Warning($"[FoodTracker][T{state.TraceID}] Failed to drop {resultingThing?.def.defName ?? "NULL"} (ID {resultingThing?.thingIDNumber ?? 0})");
 
                 // If the drop failed, don't leave a ghost item in the world. Destroy the partial meal to prevent it from lingering.
-                if (resultingThing == null && !resultingThing.Destroyed)
+                if (resultingThing != null && !resultingThing.Destroyed)
                 {
                     Log.Warning($"[FoodTracker][T{state.TraceID}] Failed to make {resultingThing?.def.defName ?? "NULL"} (ID {resultingThing?.thingIDNumber ?? 0})");
 

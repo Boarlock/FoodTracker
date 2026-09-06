@@ -2,6 +2,7 @@
 using RimWorld;
 using System.Text;
 using Verse;
+using static FoodTracker.FoodTrackerDrugEffects;
 
 namespace FoodTracker
 {
@@ -20,41 +21,49 @@ namespace FoodTracker
             if (optionalReq.Thing == null)
                 return;
 
-            // Check to see if Thing has our tracker and return if it doesn't.
-            CompFoodTracker tracker = optionalReq.Thing.TryGetComp<CompFoodTracker>();
+            Thing thing = optionalReq.Thing;
+            CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
 
+            // Check to see if Thing has our tracker and return if it doesn't.
             if (tracker == null)
                 return;
 
-            // Build the 'Base value: ' text on the GetExplanation screen and the default text that shows.
-            string descriptionBaseText = "How nutritious this food is.\n\nBase value: ";
-
-            // Get the base nutrition for the Thing and change it into our formatted string then append the descriptor base text.
-            float baseValue = optionalReq.Thing.GetStatValue(StatDefOf.Nutrition);
-            string baseValueString = baseValue.ToString("N2");
-            string baseFinal = descriptionBaseText + baseValueString + "\n\n";
-
-            // SINGLETON STATE
-            if (tracker.NutritionEntries.Count == 0)
+            // Checking to see if it's a tracked food item or tracked drug item.
+            if (FoodTrackingHelpers.GetDrugType(thing.def) == FoodTrackerDrugType.Unsupported)
             {
-                string single = $"Final Value: {tracker.PartialNutrition:N2}";
-                __result = baseFinal + single;
+                // Build the 'Base value: ' text on the GetExplanation screen and the default text that shows.
+                string descriptionBaseText = "How nutritious this food is.\n\nBase value: ";
 
-                return;
+                // Get the base nutrition for the Thing and change it into our formatted string then append the descriptor base text.
+                float baseValue = optionalReq.Thing.GetStatValue(StatDefOf.Nutrition);
+                string baseValueString = baseValue.ToString("N2");
+                string baseFinal = descriptionBaseText + baseValueString + "\n\n";
+
+                // SINGLETON STATE
+                if (tracker.NutritionEntries.Count == 0)
+                {
+                    string single = $"Final Value: {tracker.PartialNutrition:N2}";
+                    __result = baseFinal + single;
+
+                    return;
+                }
+
+                // STACK STATE
+                StringBuilder mealList = new StringBuilder();
+
+                for (int i = 0; i < tracker.NutritionEntries.Count; i++)
+                {
+                    mealList.AppendLine(
+                        $"Item {i + 1}: {tracker.NutritionEntries[i]:0.00}"
+                    );
+                }
+
+                __result = baseFinal + mealList.ToString();
             }
-
-            // STACK STATE
-            StringBuilder mealList = new StringBuilder();
-
-            for (int i = 0; i < tracker.NutritionEntries.Count; i++)
+            else
             {
-                mealList.AppendLine(
-                    $"Item {i + 1}: {tracker.NutritionEntries[i]:0.00}"
-                );
+
             }
-
-            __result = baseFinal + mealList.ToString();
-
         }
     }
 
@@ -73,33 +82,38 @@ namespace FoodTracker
                 return true;
 
             Thing thing = optionalReq.Thing;
-
-            // Check to see if Thing has our tracker and return if it doesn't.
             CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
 
+            // Check to see if Thing has our tracker and return if it doesn't.
             if (tracker == null)
                 return true;
 
-            float nutrition;
-
-            // Singleton FT meal.
-            if (tracker.NutritionEntries.Count == 0)
+            // Checking to see if it's a tracked food item or tracked drug item.
+            if (FoodTrackingHelpers.GetDrugType(thing.def) == FoodTrackerDrugType.Unsupported)
             {
-                nutrition = tracker.PartialNutrition;
+                float nutrition;
+
+                // Singleton FT meal.
+                if (tracker.NutritionEntries.Count == 0)
+                {
+                    nutrition = tracker.PartialNutrition;
+                }
+
+                // Stack FT meal.
+                else
+                {
+                    nutrition = 0f;
+
+                    for (int i = 0; i < tracker.NutritionEntries.Count; i++)
+                        nutrition += tracker.NutritionEntries[i];
+                }
+
+                __result = stat.ValueToString(nutrition, numberSense, finalized);
+
+                return false;
             }
 
-            // Stack FT meal.
-            else
-            {
-                nutrition = 0f;
-
-                for (int i = 0; i < tracker.NutritionEntries.Count; i++)
-                    nutrition += tracker.NutritionEntries[i];
-            }
-
-            __result = stat.ValueToString(nutrition, numberSense, finalized);
-
-            return false;
+            return true;
         }
     }
 }

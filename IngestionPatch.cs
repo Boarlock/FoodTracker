@@ -30,6 +30,8 @@ namespace FoodTracker
             if (!food.def.IsNutritionGivingIngestible && FoodTrackingHelpers.GetDrugType(food.def) == FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported)
                 return;
 
+            bool isDrug = (FoodTrackingHelpers.GetDrugType(food.def) != FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported);
+
             // Get the FoodTracker and Ingredients components if they exist.
             CompFoodTracker tracker = food.TryGetComp<CompFoodTracker>();
             CompIngredients ingredients = food.TryGetComp<CompIngredients>();
@@ -74,7 +76,11 @@ namespace FoodTracker
             // Get Non-FoodTracker food total nutrition, and nutrition per item.
             else
             {
-                nutritionPerItem = food.GetStatValue(StatDefOf.Nutrition);
+                if (isDrug)
+                    nutritionPerItem = food.def.GetStatValueAbstract(StatDefOf.Mass);
+                else
+                    food.def.GetStatValueAbstract(StatDefOf.Nutrition);
+
                 totalNutrition = ingestCount * nutritionPerItem;
             }
 
@@ -82,6 +88,8 @@ namespace FoodTracker
             __state = new IngestionState
             {
                 TraceID = ++nextTraceId, // Increment the trace ID for each ingestion.
+
+                IsDrug = isDrug, // Bool to track if current ingestion is a food or drug item.
 
                 Pawn = chewer, // The pawn who is eating the food.
 
@@ -106,11 +114,20 @@ namespace FoodTracker
                 IngredientsBefore = ingredientsBefore  // The ingredients of the food before ingestion, if it has a CompIngredients component.
             };
 
-            if (FoodTrackingHelpers.GetDrugType(food.def) != FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported)
-                __state.IsDrug = true;
+            // Eating duration is based on the actual total amount being consumed.
+            if (!__state.IsDrug)
+                durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
+            else if (tracker != null)
+            {
+                float drugFraction = __state.TotalNutrition / food.def.GetStatValueAbstract(StatDefOf.Mass);
+                float minimumMultiplier = 40f / FoodTrackingHelpers.GetDrugBaseIngestTicks(food.def);
 
-            // Eating duration is based on the actual total nutrition being consumed.
-            durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
+                durationMultiplier *= Mathf.Max(minimumMultiplier, drugFraction);
+            }
+            else
+            {
+                // Full non-FoodTracker drug. Multiplier remains 1 unless vanilla has another modifier.
+            }
 
             __state.TotalTicks = Mathf.RoundToInt((float)food.def.ingestible.baseIngestTicks * durationMultiplier);
 
@@ -180,6 +197,14 @@ namespace FoodTracker
             if (__instance == null || (!FoodTrackerIngestionTracker.TryGet(__instance.pawn, out IngestionState state)) || condition == JobCondition.Succeeded)
                 return;
 
+            if (state.HandlingInterruption)
+            {
+                Log.Message($"[FoodTracker][T{state.TraceID}] Reentrant interruption detected. Ignoring nested Cleanup call.");
+                return;
+            }
+
+            state.HandlingInterruption = true;
+
             // Calculate elapsed ticks since toil started and fraction of food eaten.
             int elapsedTicks = Find.TickManager.TicksGame - state.StartTick;
             state.EatenFraction = Mathf.Clamp01((float)elapsedTicks / state.TotalTicks);
@@ -190,6 +215,8 @@ namespace FoodTracker
             // Check if any food is scheduled for destruction.
             if (state.DestroyFoodAfterIngestion && state.ThingsToDestroy != null)
                 DeferredFoodDestruction.Schedule(state.ThingsToDestroy);
+
+            state.HandlingInterruption = false;
 
             FoodTrackerIngestionTracker.Remove(__instance.pawn);
         }
@@ -212,12 +239,12 @@ namespace FoodTracker
                 return;
             }
 
-            // Calculate correction based off how mnuch nutrition should be applied, and how mucn was applied.
             float vanillaNutritionAdded = state.Pawn.needs.food.CurLevel - state.HungerAtStart;
             float trueNutritionConsumed = state.TotalNutrition;
             float correction = trueNutritionConsumed - vanillaNutritionAdded;
 
-            FoodTrackingHelpers.ApplyNutritionToPawn(state, correction);
+            if (!state.IsDrug)
+                FoodTrackingHelpers.ApplyNutritionToPawn(state, correction);
 
             FoodTrackerIngestionTracker.Remove(state.Pawn);
 

@@ -132,22 +132,21 @@ namespace FoodTracker
                     state.PostFood.stackCount -= itemsRemoved;
                 }
 
-                // If ingested item is a supported drug type.
-                if(state.IsDrug)
-                {
-                    FoodTrackerDrugType drugType = FoodTrackingHelpers.GetDrugType(state.BaseDef);
-
-                    ApplyIngestionEffects(state.Pawn, state.EatenFraction, drugType, state.BaseDef);
-                }
-
                 if (FoodTrackerSettings.Verbose)
                     Log.Message($"[FoodTracker][T{state.TraceID}] Eating interrupted: {state.FoodDef.defName} (ID {state.PostFood.thingIDNumber}) " +
                         $"| Pawn: {state.Pawn.LabelShort} | Ingest Count: {state.IngestCount} | Eaten: {state.EatenFraction:P0} " +
                         $"| Total Nutrition: {state.TotalNutrition:F2} | Total Consumed: {nutritionEaten:F2} | Total Remaining: {(state.TotalNutrition - nutritionEaten):F2} " +
                         $"| Partial Nutrition: {(nextItem - nutritionRemainder)} | Whole Items Remaining: {(state.IngestCount - itemsRemoved)}");
 
-                // Give the pawn and its records exactly the amount removed from the food.
-                FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
+                // If ingested item is a supported drug type, otherwise give the pawn and its records the amount ingested.
+                if (state.IsDrug)
+                {
+                    FoodTrackerDrugType drugType = FoodTrackingHelpers.GetDrugType(state.BaseDef);
+
+                    ApplyIngestionEffects(state.Pawn, state.EatenFraction, drugType, state.BaseDef);
+                }
+                else
+                    FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
 
                 return;
 
@@ -182,8 +181,9 @@ namespace FoodTracker
                     state.PostFood.stackCount -= itemsRemoved;
                 }
 
-                // Give the pawn and its records exactly the amount removed from the food.
-                FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
+                // Give the pawn and its records the amount ingested.
+                if (!state.IsDrug)
+                    FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
 
                 return;
             }
@@ -211,8 +211,9 @@ namespace FoodTracker
                     state.PostFood.stackCount -= itemsRemoved;
                 }
 
-                // Give the pawn and its records exactly the amount removed from the food.
-                FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionCorrection);
+                // Give the pawn and its records the amount ingested.
+                if (!state.IsDrug)
+                    FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionCorrection);
 
                 return;
             }
@@ -229,16 +230,15 @@ namespace FoodTracker
                 state.PostFood.stackCount -= itemsRemoved;
             }
 
-            // If ingested item is a supported drug type.
+            // If ingested item is a supported drug type, otherwise give the pawn and its records the amount ingested.
             if (state.IsDrug)
             {
                 FoodTrackerDrugType drugType = FoodTrackingHelpers.GetDrugType(state.BaseDef);
 
                 ApplyIngestionEffects(state.Pawn, state.EatenFraction, drugType, state.BaseDef);
             }
-
-            // Give the pawn and its records exactly the amount removed from the food.
-            FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
+            else
+                FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionEaten);
 
             return;
 

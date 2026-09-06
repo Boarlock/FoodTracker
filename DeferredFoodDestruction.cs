@@ -22,7 +22,7 @@ namespace FoodTracker
             foreach (Thing thing in food) 
             {
                 if (thing != null && !thing.Destroyed)
-                    thing.Destroy();
+                    thing.Destroy(DestroyMode.Vanish);
 
 
             }

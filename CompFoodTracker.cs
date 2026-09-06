@@ -12,7 +12,6 @@ namespace FoodTracker
         // Stack state: One nutrition value for each meal represented by the stack.
         private List<float> nutritionEntries = new List<float>();
 
-
         public float PartialNutrition
         {
             get
@@ -24,7 +23,6 @@ namespace FoodTracker
                 nutritionThisMeal = value;
             }
         }
-
 
         public List<float> NutritionEntries
         {
@@ -51,11 +49,7 @@ namespace FoodTracker
             if (parent.stackCount <= 0)
                 return;
 
-            ThingDef originalDef =
-                FoodTrackingHelpers.GetOriginalMealDef(parent.def);
-
-            float nutrition =
-                originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
+            float nutrition = FoodTrackingHelpers.GetFoodTrackerNutritionValue(parent.def);
 
             // SINGLETON STATE
             if (parent.stackCount == 1)
@@ -86,47 +80,6 @@ namespace FoodTracker
             }
         }
 
-        /*        public override void PostSpawnSetup(bool respawningAfterLoad)
-                {
-                    base.PostSpawnSetup(respawningAfterLoad);
-
-                    if (parent.stackCount <= 0)
-                        return;
-
-                    ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(parent.def);
-                    float nutrition = originalDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
-
-                    // SINGLETON STATE
-                    if (parent.stackCount == 1)
-                    {
-                        nutritionEntries.Clear();
-
-                        // Only initialize the singleton nutrition if it has not already been initialized.
-                        if (nutritionThisMeal < 0f)
-                        {
-                            nutritionThisMeal = nutrition;
-                        }
-
-                        return;
-                    }
-
-                    // STACK STATE
-                    nutritionThisMeal = -1f;
-
-                    // If we already have the correct number of entries, leave the existing nutrition values alone.
-                    if (nutritionEntries.Count == parent.stackCount)
-                        return;
-
-                    // Otherwise initialize the stack.
-                    nutritionEntries.Clear();
-
-                    for (int i = 0; i < parent.stackCount; i++)
-                    {
-                        nutritionEntries.Add(nutrition);
-                    }
-                }*/
-
-
         public override void PostExposeData()
         {
             base.PostExposeData();
@@ -141,7 +94,6 @@ namespace FoodTracker
             }
         }
     }
-
 
     public class CompProperties_FoodTracker : CompProperties
     {

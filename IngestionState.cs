@@ -10,6 +10,7 @@ namespace FoodTracker
     {
         // Internal ID to track each ingestion.
         public int TraceID;
+        public bool HandlingInterruption;
         public List<float> NutritionEntriesBefore;
         public List<ThingDef> IngredientsBefore;
         public List<Thing> ThingsToDestroy = new List<Thing>();
