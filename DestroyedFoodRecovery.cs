@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using RimWorld;
+using UnityEngine;
 using Verse;
 using static FoodTracker.FoodTrackerDrugEffects;
 
@@ -17,6 +18,8 @@ namespace FoodTracker
 
                 return;
             }
+
+            FoodTrackerDrugEffects.FoodTrackerDrugType drugType = FoodTrackingHelpers.GetDrugType(state.ObjectGameDef);
 
             float consumedFraction = state.TotalFraction * state.IngestedFraction;
             float fractionIntoPartial = ((state.TotalFraction - consumedFraction) % 1f);
@@ -94,14 +97,16 @@ namespace FoodTracker
             // If ingested item is a supported drug type, otherwise give the pawn and its records the amount ingested.
             if (state.IsDrug)
             {
-                FoodTrackerDrugType drugType = FoodTrackingHelpers.GetDrugType(state.ObjectGameDef);
-
-                ApplyIngestionEffects(state, drugType);
+                FoodTrackerDrugEffects.ApplyIngestionEffects(state, drugType);
             }
-            // Need to rework from ingested fraction.
-//            else
-//                FoodTrackingHelpers.ApplyNutritionToPawn(state, consumedFraction );
 
+            if (!state.IsDrug || drugType == FoodTrackerDrugType.Ambrosia || drugType == FoodTrackerDrugType.Beer)
+            {
+                float nutritionPerItem = state.ObjectDef.GetStatValueAbstract(StatDefOf.Nutrition);
+                float nutritionConsumed = consumedFraction * nutritionPerItem;
+
+                FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionConsumed);
+            }
         }
 
         public static void HandleDestroyedFoodTrackerMeal(IngestionState state)
@@ -116,6 +121,7 @@ namespace FoodTracker
             }
 
             CompFoodTracker tracker = state.PreIngestObject.TryGetComp<CompFoodTracker>();
+            FoodTrackerDrugEffects.FoodTrackerDrugType drugType = FoodTrackingHelpers.GetDrugType(state.ObjectGameDef);
 
             // Calculate nutrition eaten.
             float consumedFraction = state.TotalFraction * state.IngestedFraction;
@@ -209,14 +215,16 @@ namespace FoodTracker
             // If ingested item is a supported drug type, otherwise give the pawn and its records the amount ingested.
             if (state.IsDrug)
             {
-                FoodTrackerDrugType drugType = FoodTrackingHelpers.GetDrugType(state.ObjectGameDef);
-
-                ApplyIngestionEffects(state, drugType);
+                FoodTrackerDrugEffects.ApplyIngestionEffects(state, drugType);
             }
-            // Need to rework from ingested fraction.
-//            else
-//                FoodTrackingHelpers.ApplyNutritionToPawn(state, consumedFraction );
 
+            if (!state.IsDrug || drugType == FoodTrackerDrugType.Ambrosia || drugType == FoodTrackerDrugType.Beer)
+            {
+                float nutritionPerItem = state.ObjectDef.GetStatValueAbstract(StatDefOf.Nutrition);
+                float nutritionConsumed = consumedFraction * nutritionPerItem;
+
+                FoodTrackingHelpers.ApplyNutritionToPawn(state, nutritionConsumed);
+            }
         }
     }
 }

@@ -1,10 +1,7 @@
 ﻿using HarmonyLib;
 using RimWorld;
-using System;
-using System.Diagnostics;
 using System.Text;
 using Verse;
-using static FoodTracker.FoodTrackerDrugEffects;
 
 namespace FoodTracker
 {
@@ -27,7 +24,7 @@ namespace FoodTracker
                 return;
 
             // Checking to see if it's a tracked food item or tracked drug item.
-            if (FoodTrackingHelpers.GetDrugType(thing.def) == FoodTrackerDrugType.Unsupported)
+            if (FoodTrackingHelpers.GetDrugType(thing.def) == FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported)
             {
                 // Modify the Nutrition tooltip.
                 if (__instance.stat == StatDefOf.Nutrition)
@@ -63,7 +60,7 @@ namespace FoodTracker
                         // Get the base nutrition per item, and initialize string builder.
                         nutritionPerItem = thing.def.GetStatValueAbstract(StatDefOf.Nutrition);
                         StringBuilder mealList = new StringBuilder();
-                        float partialFraction = 0f;
+                        float partialFraction;
 
                         for (int i = 0; i < tracker.RemainingFractions.Count; i++)
                         {
@@ -112,7 +109,7 @@ namespace FoodTracker
                         // Get the base nutrition per item, and initialize string builder.
                         massPerItem = thing.def.GetStatValueAbstract(StatDefOf.Mass);
                         StringBuilder mealList = new StringBuilder();
-                        float partialFraction = 0f;
+                        float partialFraction;
 
                         for (int i = 0; i < tracker.RemainingFractions.Count; i++)
                         {
@@ -162,7 +159,7 @@ namespace FoodTracker
                         // Get the base nutrition per item, and initialize string builder.
                         valuePerItem = thing.def.GetStatValueAbstract(StatDefOf.MarketValue);
                         StringBuilder mealList = new StringBuilder();
-                        float partialFraction = 0f;
+                        float partialFraction;
 
                         for (int i = 0; i < tracker.RemainingFractions.Count; i++)
                         {
@@ -215,7 +212,7 @@ namespace FoodTracker
                         // Get the base nutrition per item, and initialize string builder.
                         massPerItem = thing.def.GetStatValueAbstract(StatDefOf.Mass);
                         StringBuilder mealList = new StringBuilder();
-                        float partialFraction = 0f;
+                        float partialFraction;
 
                         for (int i = 0; i < tracker.RemainingFractions.Count; i++)
                         {
@@ -265,7 +262,7 @@ namespace FoodTracker
                         // Get the base nutrition per item, and initialize string builder.
                         valuePerItem = thing.def.GetStatValueAbstract(StatDefOf.MarketValue);
                         StringBuilder mealList = new StringBuilder();
-                        float partialFraction = 0f;
+                        float partialFraction;
 
                         for (int i = 0; i < tracker.RemainingFractions.Count; i++)
                         {
@@ -307,7 +304,7 @@ namespace FoodTracker
 
             // Tracked drugs don't have a Nutrition stat.
             if (stat == StatDefOf.Nutrition &&
-                FoodTrackingHelpers.GetDrugType(thing.def) != FoodTrackerDrugType.Unsupported)
+                FoodTrackingHelpers.GetDrugType(thing.def) != FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported)
                 return true;
 
             // Get the total normalized fraction represented by this Thing.

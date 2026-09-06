@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using Verse;
-using Verse.AI;
 
 namespace FoodTracker
 {
@@ -34,7 +33,6 @@ namespace FoodTracker
         public IntVec3 FoodCell;
 
         // Runtime state.
-        public JobCondition EndCondition;
         public float IngestedFraction;
         public bool DestroyFoodAfterIngestion;
     }

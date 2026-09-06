@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Verse;
 using Verse.AI;
-using static FoodTracker.FoodTrackingHelpers;
+using static FoodTracker.FoodTrackerDrugEffects;
 
 namespace FoodTracker
 {
@@ -221,25 +221,34 @@ namespace FoodTracker
             if (!FoodTrackerIngestionTracker.TryGet(ingester, out IngestionState state))
                 return;
 
-            // If food doesn't carry our component theres nothing for us to do here.
+            // Only tracked objects require FoodTracker correction.
             if (state.PostIngestObject?.TryGetComp<CompFoodTracker>() == null)
             {
                 FoodTrackerIngestionTracker.Remove(ingester);
                 return;
             }
 
-            float vanillaNutritionAdded = state.Pawn.needs.food.CurLevel - state.HungerAtStart;
-            float trueNutritionConsumed = state.TotalNutrition;
-            float correction = trueNutritionConsumed - vanillaNutritionAdded;
+            FoodTrackerDrugEffects.FoodTrackerDrugType drugType = FoodTrackingHelpers.GetDrugType(state.ObjectGameDef);
 
-            if (!state.IsDrug)
+            // How much should have been applied.
+            float consumedFraction = state.TotalFraction * state.IngestedFraction;
+
+            // Turn consumed fraction into its nutrition equivalent.
+            float nutritionPerItem = state.ObjectDef.GetStatValueAbstract(StatDefOf.Nutrition);
+            float expectedNutrition = consumedFraction * nutritionPerItem;
+
+            // How much nutrition vanilla applied and correction to be applied.
+            float vanillaNutritionAdded = state.Pawn.needs.food.CurLevel - state.HungerAtStart;
+            float correction = expectedNutrition - vanillaNutritionAdded;
+
+            if (!state.IsDrug || drugType == FoodTrackerDrugType.Ambrosia || drugType == FoodTrackerDrugType.Beer)
                 FoodTrackingHelpers.ApplyNutritionToPawn(state, correction);
 
             FoodTrackerIngestionTracker.Remove(state.Pawn);
 
             if (FoodTrackerSettings.Verbose)
                 Log.Message($"[FoodTracker][T{state.TraceID}] Eating Completed: {state.ObjectDef.defName} (ID {state.PostIngestObject.thingIDNumber}) " +
-                    $"| Nutrition Consumed: {trueNutritionConsumed:F2} | Vanilla Added: {vanillaNutritionAdded:F2} | Correction Applied: {correction:F2}");
+                    $"| Consumed Fraction: {consumedFraction:F2} | Expected Nutrition: {expectedNutrition:F2} | Vanilla Added: {vanillaNutritionAdded:F2} | Correction Applied: {correction:F2}");
         }
     }
 }
