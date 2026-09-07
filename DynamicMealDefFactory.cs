@@ -21,7 +21,7 @@ namespace FoodTracker
             if (mealDef.defName.StartsWith(Prefix))
                 return mealDef;
 
-            // Already exists.
+            // Check if it exists in the def database.
             ThingDef existingDef = DefDatabase<ThingDef>.GetNamedSilentFail(newDefName);
 
             if (existingDef != null)
@@ -46,7 +46,6 @@ namespace FoodTracker
 
             RegisterGeneratedThingDef(childDef);
 
-            // Do not touch the GameComponent while it is currently being loaded from the save.
             if (!loadingFromSave)
             {
                 FoodTrackerGameComponent component = Current.Game.GetComponent<FoodTrackerGameComponent>();
@@ -64,6 +63,7 @@ namespace FoodTracker
         // Everything needed to resolve references, short hash, adding the def to the database, and repopulating ThingCategory's
         private static void RegisterGeneratedThingDef(ThingDef childDef)
         {
+
             childDef.shortHash = 0;
             childDef.ResolveDefNameHash();
             childDef.ResolveReferences();

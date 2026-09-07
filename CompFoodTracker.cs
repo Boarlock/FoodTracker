@@ -90,60 +90,89 @@ namespace FoodTracker
             Scribe_Values.Look(ref thisMealFraction, "thisMealFraction", -1f);
             Scribe_Collections.Look(ref remainingFractions, "remainingFractions", LookMode.Value);
 
+            if (remainingFractions == null)
+                remainingFractions = new List<float>();
+
             if (Scribe.mode == LoadSaveMode.LoadingVars)
             {
                 Scribe_Values.Look(ref oldNutritionThisMeal, "nutritionThisMeal", -1f);
                 Scribe_Collections.Look(ref oldNutritionEntries, "nutritionEntries", LookMode.Value);
+
+                MigrateOldNutritionData();
             }
 
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
                 remainingFractions ??= new List<float>();
-
-                MigrateOldNutritionData();
             }
         }
 
         private void MigrateOldNutritionData()
         {
             // Nothing old was loaded.
-            if (oldNutritionThisMeal < 0f && oldNutritionEntries == null || oldNutritionEntries.Count == 0)
+            if (oldNutritionThisMeal < 0f && (oldNutritionEntries == null || oldNutritionEntries?.Count == 0))
                 return;
 
-            // Get original def to be safe and grab nutrition value from that def.
-            ThingDef originalDef = FoodTrackingHelpers.GetOriginalDef(parent.def);
-            float nutritionPerItem = originalDef.GetStatValueAbstract(StatDefOf.Nutrition);
-
-            if (nutritionPerItem <= 0f)
-                return;
-
-            // Singleton state.
-            if (oldNutritionThisMeal >= 0f && (oldNutritionEntries == null || oldNutritionEntries.Count == 0))
+            if (parent == null || parent.def == null)
             {
-                thisMealFraction = Mathf.Clamp01(oldNutritionThisMeal / nutritionPerItem);
+                Log.Warning("[FoodTracker] Cannot migrate legacy nutrition data because parent ThingDef is not available yet.");
+                return;
             }
-            // Stack state.
-            else if (oldNutritionThisMeal < 0f && oldNutritionEntries != null && oldNutritionEntries.Count > 1)
+
+            // Get original def to be safe.
+            ThingDef originalDef = parent.def;
+
+            if (originalDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
             {
+                string originalDefName = originalDef.defName.Substring(DynamicMealDefFactory.Prefix.Length);
+
+                originalDef = DefDatabase<ThingDef>.GetNamedSilentFail(originalDefName);
+            }
+            if (originalDef == null)
+            {
+                Log.Warning($"[FoodTracker] Could not find original ThingDef while migrating legacy data for {parent.def.defName}.");
+                return;
+            }
+
+            // Grab nutrition value from that def.
+            float nutritionPerItem = originalDef.GetStatValueAbstract(StatDefOf.Nutrition);
+            if (nutritionPerItem <= 0f)
+            {
+                Log.Warning($"[FoodTracker] Invalid nutrition value while migrating {parent.def.defName}: {nutritionPerItem}");
+                return;
+            }
+
+            // Stack state, accounts for a singleton to be present.
+            if (oldNutritionEntries != null && oldNutritionEntries.Count >= 2)
+            {
+                // Clear list to be fresh, set the list and clear singleton to be safe.
                 remainingFractions.Clear();
 
                 foreach (float oldNutrition in oldNutritionEntries)
                 {
                     remainingFractions.Add(Mathf.Clamp01(oldNutrition / nutritionPerItem));
                 }
-            }
 
-            // Defensive handling for an invalid legacy one-entry list.
-            if (oldNutritionEntries != null && oldNutritionEntries.Count == 1)
+                thisMealFraction = -1f;
+            }
+            // Singleton state, accounts for a single list item to be presented.
+            else
             {
-                thisMealFraction = Mathf.Clamp01(oldNutritionEntries[0] / nutritionPerItem);
+
+                float oldNutrition = oldNutritionThisMeal;
+
+                if (oldNutritionEntries != null && oldNutritionEntries.Count == 1)
+                    oldNutrition = oldNutritionEntries[0];
+
+                if (oldNutrition >= 0f)
+                    thisMealFraction = Mathf.Clamp01(oldNutrition / nutritionPerItem);
 
                 remainingFractions.Clear();
             }
 
             // Migration is complete.
             oldNutritionThisMeal = -1f;
-            oldNutritionEntries?.Clear();
+            oldNutritionEntries = null;
         }
     }
 
