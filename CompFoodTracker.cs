@@ -13,9 +13,10 @@ namespace FoodTracker
         // Stack state: One nutrition value for each meal represented by the stack.
         private List<float> remainingFractions = new List<float>();
 
-        // Temporary migration fields
+        // Temporary migration fields.
         private float oldNutritionThisMeal = -1f;
         private List<float> oldNutritionEntries = null;
+        private float oldRemainingNutrition = -1f;
 
         public float PartialFraction
         {
@@ -95,8 +96,12 @@ namespace FoodTracker
 
             if (Scribe.mode == LoadSaveMode.LoadingVars)
             {
+                // Support for when FT stored nutrition singleton values and lists nutrition values.
                 Scribe_Values.Look(ref oldNutritionThisMeal, "nutritionThisMeal", -1f);
                 Scribe_Collections.Look(ref oldNutritionEntries, "nutritionEntries", LookMode.Value);
+
+                // Support for when FT stored only nutrition singleton values.
+                Scribe_Values.Look(ref oldRemainingNutrition, "remainingNutrition", -1f);
 
                 MigrateOldNutritionData();
             }
@@ -110,7 +115,7 @@ namespace FoodTracker
         private void MigrateOldNutritionData()
         {
             // Nothing old was loaded.
-            if (oldNutritionThisMeal < 0f && (oldNutritionEntries == null || oldNutritionEntries?.Count == 0))
+            if (oldNutritionThisMeal < 0f && (oldNutritionEntries == null || oldNutritionEntries?.Count == 0) && oldRemainingNutrition < 0f)
                 return;
 
             if (parent == null || parent.def == null)
@@ -163,6 +168,9 @@ namespace FoodTracker
 
                 if (oldNutritionEntries != null && oldNutritionEntries.Count == 1)
                     oldNutrition = oldNutritionEntries[0];
+
+                if (oldRemainingNutrition >= 0f)
+                    oldNutrition = oldRemainingNutrition;
 
                 if (oldNutrition >= 0f)
                     thisMealFraction = Mathf.Clamp01(oldNutrition / nutritionPerItem);

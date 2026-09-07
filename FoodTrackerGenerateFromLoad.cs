@@ -160,7 +160,71 @@ namespace FoodTracker
             // If generated Def names don't exist this creates them.
             component.GeneratedDefNames ??= new List<string>();
 
-            // Find the map node(s) in the save file.
+            // Find the Food Restriction Database node in the save file.
+            XmlNode foodRestrictionDatabase = Scribe.loader.curXmlParent?["foodRestrictionDatabase"];
+            if (foodRestrictionDatabase != null)
+            {
+                // Find the Food Restriction node in the save file.
+                XmlNode foodRestrictions = foodRestrictionDatabase["foodRestrictions"];
+                if (foodRestrictions != null)
+                {
+                    // Iterate through the children node(s) of Food Restriction.
+                    foreach (XmlNode restrictionNode in foodRestrictions.ChildNodes)
+                    {
+                        if (restrictionNode?.Name != "li")
+                            continue;
+
+                        // Enter the Filter node(s).
+                        XmlNode filterNode = restrictionNode["filter"];
+
+                        if (filterNode == null)
+                            continue;
+
+                        // Enter allowed defs node(s).
+                        XmlNode allowedDefsNode = filterNode["allowedDefs"];
+
+                        if (allowedDefsNode == null)
+                            continue;
+
+                        // Iterate through allowed defs node(s) looking for FT defs.
+                        foreach (XmlNode defNode in allowedDefsNode.ChildNodes)
+                        {
+                            if (defNode?.Name != "li")
+                                continue;
+
+                            string generatedDefName = defNode.InnerText;
+
+                            if (string.IsNullOrEmpty(generatedDefName))
+                                continue;
+
+                            if (!generatedDefName.StartsWith(DynamicMealDefFactory.Prefix))
+                                continue;
+
+                            // Add FT defs to the HashSet.
+                            if (!DiscoveredGeneratedDefs.Add(generatedDefName))
+                                continue;
+
+                            Log.Message($"[FoodTracker] Found legacy generated def in food restrictions: {generatedDefName}");
+
+                            // Get the Non-FT defname.
+                            string originalDefName = generatedDefName.Substring(DynamicMealDefFactory.Prefix.Length);
+
+                            // Get the original def from the Database to send to the factory.
+                            ThingDef originalDef = DefDatabase<ThingDef>.GetNamedSilentFail(originalDefName);
+
+                            if (originalDef == null)
+                            {
+                                Log.Warning($"[FoodTracker] Could not find original ThingDef {originalDefName} while restoring legacy generated def.");
+                                continue;
+                            }
+
+                            DynamicMealDefFactory.CreateTrackerMeal(originalDef, true);
+                        }
+                    }
+                }
+            }
+
+            // Find the map node in the save file, if it doesn't exiswt then exist early.
             XmlNode mapsNode = Scribe.loader.curXmlParent?["maps"];
             if (mapsNode == null)
             {
@@ -168,9 +232,8 @@ namespace FoodTracker
                 return;
             }
 
+            // Iterate through all children maps.
             XmlNodeList mapChildren = mapsNode.ChildNodes;
-
-            // Find the Things node(s) inside each map node.
             foreach (XmlNode mapNode in mapChildren)
             {
 
@@ -180,18 +243,20 @@ namespace FoodTracker
                 if (mapNode.Name != "li")
                     continue;
 
+                // Enter the Things node(s).
                 XmlNode thingsNode = mapNode["things"];
 
                 if (thingsNode == null)
                     continue;
 
-                // Find Thing node(s) inside each Things node.
+                // Iterate through Thing node(s) inside Things looking for FT defs.
                 foreach (XmlNode thingNode in thingsNode.ChildNodes)
                 {
 
-                    if (thingNode.Name != "thing")
+                    if (thingNode?.Name != "thing")
                         continue;
 
+                    // Enter the def node(s).
                     XmlNode defNode = thingNode["def"];
 
                     if (defNode == null)
@@ -205,11 +270,11 @@ namespace FoodTracker
                     if (!generatedDefName.StartsWith(DynamicMealDefFactory.Prefix))
                         continue;
 
-                    // Add legacy def to hashset.
+                    // Add FT def to hashset.
                     if (!DiscoveredGeneratedDefs.Add(generatedDefName))
                         continue;
 
-                    Log.Message($"[FoodTracker] Found legacy generated def: {generatedDefName}");
+                    Log.Message($"[FoodTracker] Found legacy generated def in map Things: {generatedDefName}");
 
                     // Get the Non-FT defname.
                     string originalDefName = generatedDefName.Substring(DynamicMealDefFactory.Prefix.Length);
