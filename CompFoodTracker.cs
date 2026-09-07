@@ -1,5 +1,6 @@
 ﻿using RimWorld;
 using System.Collections.Generic;
+using UnityEngine;
 using Verse;
 
 namespace FoodTracker
@@ -11,6 +12,10 @@ namespace FoodTracker
 
         // Stack state: One nutrition value for each meal represented by the stack.
         private List<float> remainingFractions = new List<float>();
+
+        // Temporary migration fields
+        private float oldNutritionThisMeal = -1f;
+        private List<float> oldNutritionEntries = null;
 
         public float PartialFraction
         {
@@ -49,8 +54,6 @@ namespace FoodTracker
             if (parent.stackCount <= 0)
                 return;
 
-            float nutrition = FoodTrackingHelpers.GetFoodTrackerNutritionValue(parent.def);
-
             // SINGLETON STATE
             if (parent.stackCount == 1)
             {
@@ -58,7 +61,7 @@ namespace FoodTracker
 
                 if (thisMealFraction < 0f)
                 {
-                    thisMealFraction = nutrition;
+                    thisMealFraction = 1f;
                 }
 
                 return;
@@ -76,7 +79,7 @@ namespace FoodTracker
 
             for (int i = 0; i < parent.stackCount; i++)
             {
-                remainingFractions.Add(nutrition);
+                remainingFractions.Add(1f);
             }
         }
 
@@ -84,14 +87,63 @@ namespace FoodTracker
         {
             base.PostExposeData();
 
-            Scribe_Values.Look(ref thisMealFraction, "nutritionThisMeal", -1f);
+            Scribe_Values.Look(ref thisMealFraction, "thisMealFraction", -1f);
+            Scribe_Collections.Look(ref remainingFractions, "remainingFractions", LookMode.Value);
 
-            Scribe_Collections.Look(ref remainingFractions, "nutritionEntries", LookMode.Value);
+            if (Scribe.mode == LoadSaveMode.LoadingVars)
+            {
+                Scribe_Values.Look(ref oldNutritionThisMeal, "nutritionThisMeal", -1f);
+                Scribe_Collections.Look(ref oldNutritionEntries, "nutritionEntries", LookMode.Value);
+            }
 
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
                 remainingFractions ??= new List<float>();
+
+                MigrateOldNutritionData();
             }
+        }
+
+        private void MigrateOldNutritionData()
+        {
+            // Nothing old was loaded.
+            if (oldNutritionThisMeal < 0f && oldNutritionEntries == null || oldNutritionEntries.Count == 0)
+                return;
+
+            // Get original def to be safe and grab nutrition value from that def.
+            ThingDef originalDef = FoodTrackingHelpers.GetOriginalDef(parent.def);
+            float nutritionPerItem = originalDef.GetStatValueAbstract(StatDefOf.Nutrition);
+
+            if (nutritionPerItem <= 0f)
+                return;
+
+            // Singleton state.
+            if (oldNutritionThisMeal >= 0f && (oldNutritionEntries == null || oldNutritionEntries.Count == 0))
+            {
+                thisMealFraction = Mathf.Clamp01(oldNutritionThisMeal / nutritionPerItem);
+            }
+            // Stack state.
+            else if (oldNutritionThisMeal < 0f && oldNutritionEntries != null && oldNutritionEntries.Count > 1)
+            {
+                remainingFractions.Clear();
+
+                foreach (float oldNutrition in oldNutritionEntries)
+                {
+                    remainingFractions.Add(Mathf.Clamp01(oldNutrition / nutritionPerItem));
+                }
+            }
+
+            // Defensive handling for an invalid legacy one-entry list.
+            if (oldNutritionEntries != null && oldNutritionEntries.Count == 1)
+            {
+                thisMealFraction = Mathf.Clamp01(oldNutritionEntries[0] / nutritionPerItem);
+
+                remainingFractions.Clear();
+            }
+
+            // Migration is complete.
+            oldNutritionThisMeal = -1f;
+            oldNutritionEntries?.Clear();
         }
     }
 

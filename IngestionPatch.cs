@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using Verse;
 using Verse.AI;
-using static FoodTracker.FoodTrackerDrugEffects;
 
 namespace FoodTracker
 {
@@ -241,7 +240,7 @@ namespace FoodTracker
             float vanillaNutritionAdded = state.Pawn.needs.food.CurLevel - state.HungerAtStart;
             float correction = expectedNutrition - vanillaNutritionAdded;
 
-            if (!state.IsDrug || drugType == FoodTrackerDrugType.Ambrosia || drugType == FoodTrackerDrugType.Beer)
+            if (!state.IsDrug || drugType == FoodTrackerDrugEffects.FoodTrackerDrugType.Ambrosia || drugType == FoodTrackerDrugEffects.FoodTrackerDrugType.Beer)
                 FoodTrackingHelpers.ApplyNutritionToPawn(state, correction);
 
             FoodTrackerIngestionTracker.Remove(state.Pawn);

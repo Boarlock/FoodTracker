@@ -17,8 +17,8 @@ namespace FoodTracker
     {
         public CompFoodTracker SourceTracker;
         public int SourceStackBefore;
-        public List<float> SourceNutritionHistory;
-        public float SourcePartialNutrition;
+        public List<float> SourceFractionHistory;
+        public float SourcePartialFraction;
     }
 
     [HarmonyPatch(typeof(Thing), nameof(Thing.SplitOff))]
@@ -55,8 +55,8 @@ namespace FoodTracker
                 SourceTracker = sourceTracker,
                 SourceStackBefore = __instance.stackCount,
 
-                SourceNutritionHistory = new List<float>(sourceTracker.RemainingFractions),
-                SourcePartialNutrition = sourceTracker.PartialFraction
+                SourceFractionHistory = new List<float>(sourceTracker.RemainingFractions),
+                SourcePartialFraction = sourceTracker.PartialFraction
             };
 
             FoodTrackerStackOperations.SplitInProgress = true;
@@ -68,8 +68,8 @@ namespace FoodTracker
             if (__state == null || __result == null)
                 return;
 
-            List<float> resultNutritionHistory = null;
-            float resultPartialNutrition = -1f;
+            List<float> resultFractionHistory = null;
+            float resultPartialFraction = -1f;
 
             // Vanilla should have reduced the original stack by exactly the amount that was split off.
             if (__instance.stackCount != __state.SourceStackBefore - count)
@@ -91,45 +91,45 @@ namespace FoodTracker
                 
                 int diff = Math.Abs(__state.SourceStackBefore - __instance.stackCount);
 
-                resultNutritionHistory = new List<float>(resultTracker.RemainingFractions);
-                resultPartialNutrition = resultTracker.PartialFraction;
+                resultFractionHistory = new List<float>(resultTracker.RemainingFractions);
+                resultPartialFraction = resultTracker.PartialFraction;
 
                 // Setting result to singleton mode, if result is stack count of 1.
                 if (__result.stackCount == 1)
                 {
-                    resultPartialNutrition = __state.SourceNutritionHistory[0];
-                    __state.SourceNutritionHistory.RemoveAt(0);
+                    resultPartialFraction = __state.SourceFractionHistory[0];
+                    __state.SourceFractionHistory.RemoveAt(0);
 
-                    resultNutritionHistory.Clear();
+                    resultFractionHistory.Clear();
                 }
                 else
                 {
 
-                    while (diff > 0 && __state.SourceNutritionHistory.Count > 0)
+                    while (diff > 0 && __state.SourceFractionHistory.Count > 0)
                     {
-                        resultNutritionHistory.Insert(0, __state.SourceNutritionHistory[0]);
-                        __state.SourceNutritionHistory.RemoveAt(0);
+                        resultFractionHistory.Insert(0, __state.SourceFractionHistory[0]);
+                        __state.SourceFractionHistory.RemoveAt(0);
                         diff--;
                     }
 
-                    // Resulting stack is now in multi-item stack mode, so we need to reset its PartialNutrition value.
-                    resultPartialNutrition = -1f;
+                    // Resulting stack is now in multi-item stack mode, so we need to reset its PartialFraction value.
+                    resultPartialFraction = -1f;
 
-                    //Resetting source stack's PartialNutrition value, sanity check.
-                    __state.SourcePartialNutrition = -1f;
+                    //Resetting source stack's PartialFraction value, sanity check.
+                    __state.SourcePartialFraction = -1f;
 
                 }
                 // Setting source to singleton mode.
                 if (__instance.stackCount == 1)
                 {
-                    __state.SourcePartialNutrition = __state.SourceNutritionHistory[0];
-                    __state.SourceNutritionHistory.Clear();
+                    __state.SourcePartialFraction = __state.SourceFractionHistory[0];
+                    __state.SourceFractionHistory.Clear();
                 }
                 // Resetting source, sanity check.
                 if (__instance.stackCount == 0)
                 {
-                    __state.SourcePartialNutrition = -1f;
-                    __state.SourceNutritionHistory.Clear();
+                    __state.SourcePartialFraction = -1f;
+                    __state.SourceFractionHistory.Clear();
                 }
 
 
@@ -137,11 +137,11 @@ namespace FoodTracker
             finally
             {
 
-                resultTracker.RemainingFractions = resultNutritionHistory;
-                resultTracker.PartialFraction = resultPartialNutrition;
+                resultTracker.RemainingFractions = resultFractionHistory;
+                resultTracker.PartialFraction = resultPartialFraction;
 
-                __state.SourceTracker.RemainingFractions = __state.SourceNutritionHistory;
-                __state.SourceTracker.PartialFraction = __state.SourcePartialNutrition;
+                __state.SourceTracker.RemainingFractions = __state.SourceFractionHistory;
+                __state.SourceTracker.PartialFraction = __state.SourcePartialFraction;
 
                 FoodTrackerStackOperations.SplitInProgress = false;
             }
@@ -156,11 +156,11 @@ namespace FoodTracker
         public int TargetStackBefore;
         public int SourceStackBefore;
 
-        public float TargetPartialNutrition;
-        public float SourcePartialNutrition;
+        public float TargetPartialFraction;
+        public float SourcePartialFraction;
 
-        public List<float> TargetNutritionHistory;
-        public List<float> SourceNutritionHistory;
+        public List<float> TargetFractionHistory;
+        public List<float> SourceFractionHistory;
     }
 
     [HarmonyPatch(typeof(Thing), nameof(Thing.TryAbsorbStack))]
@@ -194,11 +194,11 @@ namespace FoodTracker
                 TargetStackBefore = __instance.stackCount,
                 SourceStackBefore = other.stackCount,
 
-                TargetNutritionHistory = new List<float>(targetTracker.RemainingFractions),
-                SourceNutritionHistory = new List<float>(sourceTracker.RemainingFractions),
+                TargetFractionHistory = new List<float>(targetTracker.RemainingFractions),
+                SourceFractionHistory = new List<float>(sourceTracker.RemainingFractions),
 
-                TargetPartialNutrition = targetTracker.PartialFraction,
-                SourcePartialNutrition = sourceTracker.PartialFraction
+                TargetPartialFraction = targetTracker.PartialFraction,
+                SourcePartialFraction = sourceTracker.PartialFraction
             };
 
             FoodTrackerStackOperations.MergeInProgress = true;
@@ -225,94 +225,94 @@ namespace FoodTracker
             {
                 
                 // Bootstrap any uninitialized singleton FT meals. This mirrors CompFoodTracker.PostSpawnSetup initialization.
-                if (__state.TargetNutritionHistory.Count == 0 && __state.TargetPartialNutrition < 0f)
+                if (__state.TargetFractionHistory.Count == 0 && __state.TargetPartialFraction < 0f)
                 {
-                    __state.TargetPartialNutrition = FoodTrackingHelpers.GetFoodTrackerNutritionValue(__instance.def);
+                    __state.TargetPartialFraction = 1f;
                 }
                 else if
-                    (__state.SourceNutritionHistory.Count == 0 && __state.SourcePartialNutrition < 0f)
+                    (__state.SourceFractionHistory.Count == 0 && __state.SourcePartialFraction < 0f)
                 {
-                    __state.SourcePartialNutrition = FoodTrackingHelpers.GetFoodTrackerNutritionValue(other.def);
+                    __state.SourcePartialFraction = 1f;
                 }
 
-                // Stack merge case: If both stacks had more than one item, we need to append the NutritionEntries lists both ways..
+                // Stack merge case: If both stacks had more than one item, we need to append the FractionEntries lists both ways..
                 if (__state.TargetStackBefore > 1 && __state.SourceStackBefore > 1)
                 {
                     if (diff > 0)
                     {
 
-                        while (diff > 0 && __state.SourceNutritionHistory.Count > 0)
+                        while (diff > 0 && __state.SourceFractionHistory.Count > 0)
                         {
-                            __state.TargetNutritionHistory.Insert(0, __state.SourceNutritionHistory[0]);
-                            __state.SourceNutritionHistory.RemoveAt(0);
+                            __state.TargetFractionHistory.Insert(0, __state.SourceFractionHistory[0]);
+                            __state.SourceFractionHistory.RemoveAt(0);
                             diff--;
 
                         }
                         // If the source stack is now a singleton.
-                        if (__state.SourceNutritionHistory.Count == 1)
+                        if (__state.SourceFractionHistory.Count == 1)
                         {
-                            // Target list should already have its PartialNutrition value set, but we reset it just in case.
-                            __state.TargetPartialNutrition = -1f;
+                            // Target list should already have its PartialFraction value set, but we reset it just in case.
+                            __state.TargetPartialFraction = -1f;
 
-                            // Source stack has become a singleton, so we need to set its PartialNutrition value and clear its NutritionEntries list.
-                            __state.SourcePartialNutrition = __state.SourceNutritionHistory[0];
-                            __state.SourceNutritionHistory.Clear();
+                            // Source stack has become a singleton, so we need to set its PartialFraction value and clear its FractionEntries list.
+                            __state.SourcePartialFraction = __state.SourceFractionHistory[0];
+                            __state.SourceFractionHistory.Clear();
 
                         }
                         // Source stack has become empty, sanity check.
-                        else if (__state.SourceNutritionHistory.Count == 0)
+                        else if (__state.SourceFractionHistory.Count == 0)
                         {
-                            // Target list should already have its PartialNutrition value set, but we reset it just in case.
-                            __state.TargetPartialNutrition = -1f;
+                            // Target list should already have its PartialFraction value set, but we reset it just in case.
+                            __state.TargetPartialFraction = -1f;
 
-                            // Source stack has become empty, so we need to reset its PartialNutrition value and clear its NutritionEntries list.
-                            __state.SourcePartialNutrition = -1f;
-                            __state.SourceNutritionHistory.Clear();
+                            // Source stack has become empty, so we need to reset its PartialFraction value and clear its FractionEntries list.
+                            __state.SourcePartialFraction = -1f;
+                            __state.SourceFractionHistory.Clear();
 
                         }
-                        // Target stack and Source stack are both still multi-item stacks, reset both PartialNutrition values, sanity check.
+                        // Target stack and Source stack are both still multi-item stacks, reset both PartialFraction values, sanity check.
                         else
                         {
-                            __state.TargetPartialNutrition = -1f;
-                            __state.SourcePartialNutrition = -1f;
+                            __state.TargetPartialFraction = -1f;
+                            __state.SourcePartialFraction = -1f;
                         }
                     }
                     else
                     {
-                        while (diff > 0 && __state.TargetNutritionHistory.Count > 0)
+                        while (diff > 0 && __state.TargetFractionHistory.Count > 0)
                         {
-                            __state.SourceNutritionHistory.Insert(0, __state.TargetNutritionHistory[0]);
-                            __state.TargetNutritionHistory.RemoveAt(0);
+                            __state.SourceFractionHistory.Insert(0, __state.TargetFractionHistory[0]);
+                            __state.TargetFractionHistory.RemoveAt(0);
                             diff--;
 
                         }
                         // If the target stack is now a singleton.
-                        if (__state.TargetNutritionHistory.Count == 1)
+                        if (__state.TargetFractionHistory.Count == 1)
                         {
-                            // Source list should already have its PartialNutrition value set, but we reset it just in case.
-                            __state.SourcePartialNutrition = -1f;
+                            // Source list should already have its PartialFraction value set, but we reset it just in case.
+                            __state.SourcePartialFraction = -1f;
 
-                            // Target stack has become a singleton, so we need to set its PartialNutrition value and clear its NutritionEntries list.
-                            __state.TargetPartialNutrition = __state.TargetNutritionHistory[0];
-                            __state.TargetNutritionHistory.Clear();
+                            // Target stack has become a singleton, so we need to set its PartialFraction value and clear its FractionEntries list.
+                            __state.TargetPartialFraction = __state.TargetFractionHistory[0];
+                            __state.TargetFractionHistory.Clear();
 
                         }
                         // Target stack has become empty, sanity check.
-                        else if (__state.TargetNutritionHistory.Count == 0)
+                        else if (__state.TargetFractionHistory.Count == 0)
                         {
-                            // Source list should already have its PartialNutrition value set, but we reset it just in case.
-                            __state.SourcePartialNutrition = -1f;
+                            // Source list should already have its PartialFraction value set, but we reset it just in case.
+                            __state.SourcePartialFraction = -1f;
 
-                            // Target stack has become empty, so we need to reset its PartialNutrition value and clear its NutritionEntries list.
-                            __state.TargetPartialNutrition = -1f;
-                            __state.TargetNutritionHistory.Clear();
+                            // Target stack has become empty, so we need to reset its PartialFraction value and clear its FractionEntries list.
+                            __state.TargetPartialFraction = -1f;
+                            __state.TargetFractionHistory.Clear();
 
                         }
-                        // Target stack and Source stack are both still multi-item stacks, reset both PartialNutrition values, sanity check.
+                        // Target stack and Source stack are both still multi-item stacks, reset both PartialFraction values, sanity check.
                         else
                         {
-                            __state.TargetPartialNutrition = -1f;
-                            __state.SourcePartialNutrition = -1f;
+                            __state.TargetPartialFraction = -1f;
+                            __state.SourcePartialFraction = -1f;
                         }
                     }
 
@@ -321,115 +321,115 @@ namespace FoodTracker
                 }
 
                 // Append singleton merge case: If one stack was a singleton and the other stack had more than one item,
-                // we need to add the PartialNutrition value of the singleton to the NutritionEntries list of the resulting stack.
+                // we need to add the PartialFraction value of the singleton to the FractionEntries list of the resulting stack.
                 if ((__state.TargetStackBefore > 1 && __state.SourceStackBefore == 1) || (__state.SourceStackBefore > 1 && __state.TargetStackBefore == 1))
                 {
                     // Target singleton became the 10-stack while Source became singleton.
                     if (__state.TargetStackBefore == 1 && targetStackAfter > 1 && sourceStackAfter == 1)
                     {
                         // Add Target's singleton nutrition into its list.
-                        __state.TargetNutritionHistory.Insert(0, __state.TargetPartialNutrition);
+                        __state.TargetFractionHistory.Insert(0, __state.TargetPartialFraction);
 
-                        __state.TargetPartialNutrition = -1f;
+                        __state.TargetPartialFraction = -1f;
 
                         // Transfer the additional items from Source.
-                        while (diff > 0 && __state.SourceNutritionHistory.Count > 0)
+                        while (diff > 0 && __state.SourceFractionHistory.Count > 0)
                         {
-                            __state.TargetNutritionHistory.Insert(0, __state.SourceNutritionHistory[0]);
-                            __state.SourceNutritionHistory.RemoveAt(0);
+                            __state.TargetFractionHistory.Insert(0, __state.SourceFractionHistory[0]);
+                            __state.SourceFractionHistory.RemoveAt(0);
                             diff--;
 
                         }
 
                         // Source is now the singleton.
-                        __state.SourcePartialNutrition = __state.SourceNutritionHistory[0];
-                        __state.SourceNutritionHistory.Clear();
+                        __state.SourcePartialFraction = __state.SourceFractionHistory[0];
+                        __state.SourceFractionHistory.Clear();
                     }
                     // Source singleton became the 10-stack while Target became singleton.
                     else if (__state.SourceStackBefore == 1 && sourceStackAfter > 1 && targetStackAfter == 1)
                     {
                         // Add Source's singleton nutrition into its list.
-                        __state.SourceNutritionHistory.Insert(0, __state.SourcePartialNutrition);
-                        __state.SourcePartialNutrition = -1f;
+                        __state.SourceFractionHistory.Insert(0, __state.SourcePartialFraction);
+                        __state.SourcePartialFraction = -1f;
 
                         // Transfer the additional items from Target.
-                        while (diff > 0 && __state.TargetNutritionHistory.Count > 0)
+                        while (diff > 0 && __state.TargetFractionHistory.Count > 0)
                         {
-                            __state.SourceNutritionHistory.Insert(0, __state.TargetNutritionHistory[0]);
-                            __state.TargetNutritionHistory.RemoveAt(0);
+                            __state.SourceFractionHistory.Insert(0, __state.TargetFractionHistory[0]);
+                            __state.TargetFractionHistory.RemoveAt(0);
                             diff--;
                         }
 
                         // Target is now the singleton.
-                        __state.TargetPartialNutrition = __state.TargetNutritionHistory[0];
-                        __state.TargetNutritionHistory.Clear();
+                        __state.TargetPartialFraction = __state.TargetFractionHistory[0];
+                        __state.TargetFractionHistory.Clear();
                     }
                     // Source large stack was absorbed into target singleton.
                     else if (__state.TargetStackBefore == 1 && __state.SourceStackBefore > 1 && targetStackAfter > 1 && sourceStackAfter == 0)
                     {
                         // Target needs to add its own singleton entry.
-                        __state.TargetNutritionHistory.Insert(0, __state.TargetPartialNutrition);
-                        __state.TargetPartialNutrition = -1f;
+                        __state.TargetFractionHistory.Insert(0, __state.TargetPartialFraction);
+                        __state.TargetPartialFraction = -1f;
 
-                        while (diff > 0 && __state.SourceNutritionHistory.Count > 0)
+                        while (diff > 0 && __state.SourceFractionHistory.Count > 0)
                         {
-                            __state.TargetNutritionHistory.Insert(0, __state.SourceNutritionHistory[0]);
-                            __state.SourceNutritionHistory.RemoveAt(0);
+                            __state.TargetFractionHistory.Insert(0, __state.SourceFractionHistory[0]);
+                            __state.SourceFractionHistory.RemoveAt(0);
                             diff--;
 
                         }
 
                         // Source entry and source list needs to be reset.
-                        __state.SourcePartialNutrition = -1f;
-                        __state.SourceNutritionHistory.Clear();
+                        __state.SourcePartialFraction = -1f;
+                        __state.SourceFractionHistory.Clear();
 
                     }
                     // Target large stack was absorbed into source singleton.
                     else if (__state.SourceStackBefore == 1 && __state.TargetStackBefore > 1 && sourceStackAfter > 1 && targetStackAfter == 0)
                     {
                         // Source needs to add its own singleton entry.
-                        __state.SourceNutritionHistory.Insert(0, __state.SourcePartialNutrition);
-                        __state.SourcePartialNutrition = -1f;
+                        __state.SourceFractionHistory.Insert(0, __state.SourcePartialFraction);
+                        __state.SourcePartialFraction = -1f;
 
-                        while (diff > 0 && __state.TargetNutritionHistory.Count > 0)
+                        while (diff > 0 && __state.TargetFractionHistory.Count > 0)
                         {
-                            __state.SourceNutritionHistory.Insert(0, __state.TargetNutritionHistory[0]);
-                            __state.TargetNutritionHistory.RemoveAt(0);
+                            __state.SourceFractionHistory.Insert(0, __state.TargetFractionHistory[0]);
+                            __state.TargetFractionHistory.RemoveAt(0);
                             diff--;
 
                         }
 
                         // Target entry and target list needs to be reset.
-                        __state.TargetPartialNutrition = -1f;
-                        __state.TargetNutritionHistory.Clear();
+                        __state.TargetPartialFraction = -1f;
+                        __state.TargetFractionHistory.Clear();
 
                     }
                     // Target singleton was absorbed by larger source.
                     else if (__state.TargetStackBefore == 1 && __state.SourceStackBefore > 1 && targetStackAfter == 0 && sourceStackAfter > 1)
                     {
                         // Soruce list absorbs targets singleton entry.
-                        __state.SourceNutritionHistory.Insert(0, __state.TargetPartialNutrition);
+                        __state.SourceFractionHistory.Insert(0, __state.TargetPartialFraction);
 
-                        // Source list should already have its PartialNutrition value set, but we reset it just in case.
-                        __state.SourcePartialNutrition = -1f;
+                        // Source list should already have its PartialFraction value set, but we reset it just in case.
+                        __state.SourcePartialFraction = -1f;
 
                         // Target entry and target list needs to be reset.
-                        __state.TargetPartialNutrition = -1f;
-                        __state.TargetNutritionHistory.Clear();
+                        __state.TargetPartialFraction = -1f;
+                        __state.TargetFractionHistory.Clear();
 
                     }
                     // Source singleton was absorbed by larger target.
                     else if (__state.SourceStackBefore == 1 && __state.TargetStackBefore > 1 && sourceStackAfter == 0 && targetStackAfter > 1)
                     {
                         // Target list absorbs sources singleton entry.
-                        __state.TargetNutritionHistory.Insert(0, __state.SourcePartialNutrition);
+                        __state.TargetFractionHistory.Insert(0, __state.SourcePartialFraction);
 
-                        // Target list should already have its PartialNutrition value set, but we reset it just in case.
-                        __state.TargetPartialNutrition = -1f;
+                        // Target list should already have its PartialFraction value set, but we reset it just in case.
+                        __state.TargetPartialFraction = -1f;
 
                         // Source entry and source list needs to be reset.
-                        __state.SourcePartialNutrition = -1f;
-                        __state.SourceNutritionHistory.Clear();
+                        __state.SourcePartialFraction = -1f;
+                        __state.SourceFractionHistory.Clear();
 
                     }
 
@@ -438,37 +438,37 @@ namespace FoodTracker
                 }
 
                 // Singleton merge case: If either stack was a singleton, we need to add.
-                // the PartialNutrition values to the NutritionEntries list of the resulting stack.
+                // the PartialFraction values to the FractionEntries list of the resulting stack.
                 if ((targetStackAfter == 2 && sourceStackAfter == 0) || (sourceStackAfter == 2 && targetStackAfter == 0))
                 {
                     // If target became the double stack.
                     if (targetStackAfter == 2)
                     {
                         // Target list absorbs it's own entry and sources entry.
-                        __state.TargetNutritionHistory.Insert(0, __state.TargetPartialNutrition);
-                        __state.TargetNutritionHistory.Insert(0, __state.SourcePartialNutrition);
+                        __state.TargetFractionHistory.Insert(0, __state.TargetPartialFraction);
+                        __state.TargetFractionHistory.Insert(0, __state.SourcePartialFraction);
 
                         // Target entry needs to be reset.
-                        __state.TargetPartialNutrition = -1f;
+                        __state.TargetPartialFraction = -1f;
 
                         // Source entry and source list needs to be reset.
-                        __state.SourcePartialNutrition = -1f;
-                        __state.SourceNutritionHistory.Clear();
+                        __state.SourcePartialFraction = -1f;
+                        __state.SourceFractionHistory.Clear();
 
                     }
                     // If source became the double stack.
                     else
                     {
                         // Source list absorbs it's own entry and targets entry.
-                        __state.SourceNutritionHistory.Insert(0, __state.SourcePartialNutrition);
-                        __state.SourceNutritionHistory.Insert(0, __state.TargetPartialNutrition);
+                        __state.SourceFractionHistory.Insert(0, __state.SourcePartialFraction);
+                        __state.SourceFractionHistory.Insert(0, __state.TargetPartialFraction);
 
                         // Source entry needs to be reset.
-                        __state.SourcePartialNutrition = -1f;
+                        __state.SourcePartialFraction = -1f;
 
                         // Target entry and target list needs to be reset.
-                        __state.TargetPartialNutrition = -1f;
-                        __state.TargetNutritionHistory.Clear();
+                        __state.TargetPartialFraction = -1f;
+                        __state.TargetFractionHistory.Clear();
 
                     }
 
@@ -482,13 +482,13 @@ namespace FoodTracker
                 if (__state != null)
                 {
                     __state.TargetTracker.RemainingFractions.Clear();
-                    __state.TargetTracker.RemainingFractions.AddRange(__state.TargetNutritionHistory);
+                    __state.TargetTracker.RemainingFractions.AddRange(__state.TargetFractionHistory);
 
                     __state.SourceTracker.RemainingFractions.Clear();
-                    __state.SourceTracker.RemainingFractions.AddRange(__state.SourceNutritionHistory);
+                    __state.SourceTracker.RemainingFractions.AddRange(__state.SourceFractionHistory);
 
-                    __state.TargetTracker.PartialFraction = __state.TargetPartialNutrition;
-                    __state.SourceTracker.PartialFraction = __state.SourcePartialNutrition;
+                    __state.TargetTracker.PartialFraction = __state.TargetPartialFraction;
+                    __state.SourceTracker.PartialFraction = __state.SourcePartialFraction;
                 }
 
                 ValidateTrackerState(__instance, __state.TargetTracker);

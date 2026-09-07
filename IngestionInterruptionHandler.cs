@@ -1,7 +1,6 @@
 ﻿using RimWorld;
 using UnityEngine;
 using Verse;
-using static FoodTracker.FoodTrackerDrugEffects;
 
 namespace FoodTracker
 {
@@ -146,7 +145,7 @@ namespace FoodTracker
                     FoodTrackerDrugEffects.ApplyIngestionEffects(state, drugType);
                 }
 
-                if (!state.IsDrug || drugType == FoodTrackerDrugType.Ambrosia || drugType == FoodTrackerDrugType.Beer)
+                if (!state.IsDrug || drugType == FoodTrackerDrugEffects.FoodTrackerDrugType.Ambrosia || drugType == FoodTrackerDrugEffects.FoodTrackerDrugType.Beer)
                 {
                     float nutritionPerItem = state.ObjectDef.GetStatValueAbstract(StatDefOf.Nutrition);
                     float nutritionConsumed = consumedFraction * nutritionPerItem;
@@ -238,7 +237,7 @@ namespace FoodTracker
                 FoodTrackerDrugEffects.ApplyIngestionEffects(state, drugType);
             }
 
-            if (!state.IsDrug || drugType == FoodTrackerDrugType.Ambrosia || drugType == FoodTrackerDrugType.Beer)
+            if (!state.IsDrug || drugType == FoodTrackerDrugEffects.FoodTrackerDrugType.Ambrosia || drugType == FoodTrackerDrugEffects.FoodTrackerDrugType.Beer)
             {
                 float nutritionPerItem = state.ObjectDef.GetStatValueAbstract(StatDefOf.Nutrition);
                 float nutritionConsumed = consumedFraction * nutritionPerItem;

@@ -67,19 +67,6 @@ namespace FoodTracker
             }
         }
 
-        public static float GetFoodTrackerNutritionValue(ThingDef def)
-        {
-            ThingDef originalDef = GetOriginalDef(def);
-
-            if (originalDef == null)
-                return 0f;
-
-            if (GetDrugType(originalDef) != FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported)
-                return originalDef.GetStatValueAbstract(StatDefOf.Mass);
-
-            return originalDef.GetStatValueAbstract(StatDefOf.Nutrition);
-        }
-
         // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
         public static ThingDef GetOriginalDef(ThingDef objDef)
         {
