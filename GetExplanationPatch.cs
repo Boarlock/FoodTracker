@@ -77,12 +77,12 @@ namespace FoodTracker
                     }
                 }
             }
-            // It is a tracked item but not a food item.
+            // Mass inspect patch should be shown for all FT items.
             else if (__instance.stat == StatDefOf.Mass)
             {
                 __result = GetMassInspectDescription(thing, tracker);
             }
-            // If the player is looking at market value tooltip.
+            // Value inspect patch should be shown for all FT items.
             else if (__instance.stat == StatDefOf.MarketValue)
             {
                 __result = GetValueInspectDescription(thing, tracker);
