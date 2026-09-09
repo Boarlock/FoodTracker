@@ -11,6 +11,10 @@
   <ItemGroup>
     <Compile Remove="Experiments\**" />
   </ItemGroup>
+	        
+  <ItemGroup>
+    <None Include=".github\copilot-instructions.md" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ILRepack.Lib.MSBuild.Task" Version="2.0.46">
@@ -20,13 +24,9 @@
   </ItemGroup>
 
   <ItemGroup>
-	  <Reference Include="0Harmony">
-		  <HintPath>0Harmony.dll</HintPath>
-		  <Private>true</Private>
-	  </Reference>
-  </ItemGroup>
-
-  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>Lib\0Harmony.dll</HintPath>
+    </Reference>
     <Reference Include="Assembly-CSharp">
       <HintPath>..\..\..\..\..\..\Games\Rimworld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
     </Reference>
@@ -40,9 +40,10 @@
 
 		<ItemGroup>
 			<AssembliesToMerge Include="$(TargetPath)" />
-			<AssembliesToMerge Include="$(TargetDir)0Harmony.dll" />
+			<AssembliesToMerge Include="$(MSBuildProjectDirectory)\Lib\0Harmony.dll" />
 
 			<ILRepackLibraryPath Include="$(RimWorldManagedPath)" />
+			<ILRepackLibraryPath Include="$(MSBuildProjectDirectory)\Lib" />
 		</ItemGroup>
 
 		<PropertyGroup>
@@ -50,21 +51,9 @@
 			<MergedOutput>$(TargetDir)FoodTracker_Merged.dll</MergedOutput>
 		</PropertyGroup>
 
-		<ILRepack
-			InputAssemblies="@(AssembliesToMerge)"
-			OutputFile="$(MergedOutput)"
-			TargetKind="SameAsPrimaryAssembly"
-			DebugInfo="true"
-			AllowDuplicateResources="false"
-			Parallel="true"
-			LibraryPath="@(ILRepackLibraryPath)"
-			Internalize="$(Internalize)"
-    />
+		<ILRepack InputAssemblies="@(AssembliesToMerge)" OutputFile="$(MergedOutput)" TargetKind="SameAsPrimaryAssembly" DebugInfo="true" AllowDuplicateResources="false" Parallel="true" LibraryPath="@(ILRepackLibraryPath)" Internalize="$(Internalize)" />
 
-		<Copy
-			SourceFiles="$(MergedOutput)"
-			DestinationFiles="$(TargetPath)"
-			OverwriteReadOnlyFiles="true" />
+		<Copy SourceFiles="$(MergedOutput)" DestinationFiles="$(TargetPath)" OverwriteReadOnlyFiles="true" />
 
 		<Delete Files="$(MergedOutput)" />
 

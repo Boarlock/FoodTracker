@@ -11,122 +11,136 @@ using Verse;
 
 namespace FoodTracker
 {
-    // OLD C#: int num19 = Mathf.Min(Mathf.CeilToInt(Mathf.Min(0.2f, cachedMaxFoodLevel[num13]) / num17), thingDefCount3.Count);
-    //         tmpDaysWorthOfFoodForPawn[num13] += num18 * (float)num19;
-
-    // NEW C#: int num19 = CaravanPatch.GetRequiredItemCount(Mathf.Min(0.2f, cachedMaxFoodLevel[num13]), thingDefCount3);
-    //         tmpDaysWorthOfFoodForPawn[num13] += CaravanPatch.GetActualFoodDaysContribution(num18, num17);
-
+    
     [HarmonyPatch(typeof(DaysWorthOfFoodCalculator), "ApproxDaysWorthOfFood", new[] { typeof(List<Pawn>), typeof(List<ThingDefCount>), typeof(PlanetTile),
         typeof(IgnorePawnsInventoryMode), typeof(Faction), typeof(WorldPath), typeof(float), typeof(int), typeof(bool)})]
     public static class CaravanPatch_DaysWorthOfFoodCalculator
     {
+
         [HarmonyTranspiler]
         public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
 
-            // Target method Verse.ThingDefCount.get_ThingDef()
-            MethodInfo minInt = AccessTools.Method(typeof(Mathf), nameof(Mathf.Min), new[] { typeof(float), typeof(float) });
-            MethodInfo listGetItem = AccessTools.Method(typeof(List<float>), "get_Item");
+            // Target method UnityEngine.Mathf.Min().
+            MethodInfo minFloat = AccessTools.Method(typeof(Mathf), nameof(Mathf.Min), new[] { typeof(float), typeof(float) });
 
             var codes = new List<CodeInstruction>(instructions);
 
-            for (int i = 0; i < codes.Count; i++)
+            for (int i = 3; i < codes.Count - 5; i++)
             {
-                // IL_0691: call float32 [UnityEngine.CoreModule]UnityEngine.Mathf::Min(float32, float32). Begin after this.
-                if (codes[i - 1].opcode == OpCodes.Call && codes[i - 1].operand is MethodInfo method && method.Name == nameof(Mathf.Min) &&
-                    method.DeclaringType == typeof(Mathf) && (codes[i].opcode == OpCodes.Ldloc_S || codes[i].opcode == OpCodes.Ldloc))
+
+                // OLD C#: int num19 = Mathf.Min(Mathf.CeilToInt(Mathf.Min(0.2f, cachedMaxFoodLevel[num13]) / num17), thingDefCount3.Count);
+                // NEW C#: int num19 = CaravanPatch.GetRequiredItemCount(Mathf.Min(0.2f, cachedMaxFoodLevel[num13]), thingDefCount3);
+                if (codes[i - 1].Calls(minFloat) && LoadsTargetLocal(codes[i], 60))
                 {
-                    // Verify local index 60 regardless of operand box type (LocalBuilder, LocalVariableInfo, int, etc.)
-                    int localIndex = -1;
-                    if (codes[i].operand is LocalVariableInfo lvi) 
-                        localIndex = lvi.LocalIndex;
-                    else if (codes[i].operand != null && int.TryParse(codes[i].operand.ToString(), out int parsed)) 
-                        localIndex = parsed;
 
-                    if (localIndex == 60)
-                    {
-                        // Leave IL_0696 (ldloc.s 60) as a fallback if not FT Item (num17).
+                    // Leave IL_0696 (ldloc.s 60) as a fallback if not FT Item (num17).
 
-                        // Replace IL_0698 (div) with ldloc.s 59 (thingDefCount3)
-                        codes[i + 1] = CodeInstruction.LoadLocal(59);
+                    // Replace IL_0698 (div) with ldloc.s 59 (thingDefCount3).
+                    codes[i + 1] = CodeInstruction.LoadLocal(59);
 
-                        // Remove the 3 instructions (IL_0699, IL_069e, IL_06a0)
-                        codes.RemoveRange((i + 2), 3);
+                    // Remove the 3 instructions (IL_0699, IL_069e, IL_06a0).
+                    codes.RemoveRange((i + 2), 3);
 
-                        // Replace IL_06a5 (Mathf.Min int, int) now shifted down to index (i + 1) with method call
-                        codes[i + 1] = CodeInstruction.Call(typeof(CaravanPatch), nameof(CaravanPatch.GetRequiredItemCount));
+                    // Replace IL_06a5 (Mathf.Min int, int) now shifted down to index (i + 1) with method call.
+                    codes[i + 1] = CodeInstruction.Call(typeof(CaravanPatch), nameof(CaravanPatch.GetRequiredItemCount));
 
-                        break;
-                    }
+                    break;
+                    
                 }
 
-                if (codes[i - 1].opcode == OpCodes.Callvirt && codes[i - 1].operand is MethodInfo method2 && method2.Name == "get_Item" &&
-                    method2.DeclaringType == typeof(List<float>) && (codes[i].opcode == OpCodes.Ldloc_S || codes[i].opcode == OpCodes.Ldloc))
+                // OLD C# tmpDaysWorthOfFoodForPawn[num13] += num18 * (float)num19;
+                // NEW C# tmpDaysWorthOfFoodForPawn[num13] += CaravanPatch.GetActualFoodDaysContribution(num18, num17);
+                if (LoadsTargetLocal(codes[i], 61) && LoadsTargetLocal(codes[i - 2], 55) && LoadsTargetLocal(codes[i - 3], 54))
                 {
-                    // Verify local index 61 regardless of operand box type (LocalBuilder, LocalVariableInfo, int, etc.)
-                    int localIndex = -1;
-                    if (codes[i].operand is LocalVariableInfo lvi)
-                        localIndex = lvi.LocalIndex;
-                    else if (codes[i].operand != null && int.TryParse(codes[i].operand.ToString(), out int parsed))
-                        localIndex = parsed;
 
-                    if (localIndex == 61)
-                    {
-                        // Don't touch IL_06c4, vanilla loads num18 for us.
+                    // Don't touch IL_06c4, vanilla loads num18 for us.
 
-                        // Replace IL_06c6 (ldloc.s 62) with ldloc.s 60 (num17)
-                        codes[i + 1] = CodeInstruction.LoadLocal(60);
+                    // Replace IL_06c6 (ldloc.s 62) with ldloc.s 60 (num17).
+                    codes[i + 1] = CodeInstruction.LoadLocal(60);
 
-                        // Replace IL_06c8 (conv.r4) with our method call
-                        codes[i + 2] = CodeInstruction.Call(typeof(CaravanPatch), nameof(CaravanPatch.GetActualFoodDaysContribution), new[] { typeof(float), typeof(float) });
+                    // Replace IL_06c8 (conv.r4) with our method call.
+                    codes[i + 2] = CodeInstruction.Call(typeof(CaravanPatch), nameof(CaravanPatch.GetActualFoodDaysContribution));
 
-                        // Remove IL_06c9 (mul)
-                        codes.RemoveAt(i + 3);
-                    }
+                    // Remove IL_06c9 (mul).
+                    codes.RemoveAt(i + 3);
+
+                    break;
+                    
                 }
             }
             return codes;
         }
+
+        private static bool LoadsTargetLocal(CodeInstruction instruction, int localIndex)
+        {
+            if (instruction.opcode == OpCodes.Ldloc_S)
+            {
+                // Convert the operand safely; it could be a byte, sbyte, or LocalBuilder object.
+                if (instruction.operand is byte b && b == localIndex) return true;
+                else if (instruction.operand is sbyte sb && sb == localIndex) return true;
+                else if (instruction.operand is IConvertible c && Convert.ToInt32(c) == localIndex) return true;
+            }
+
+            return false;
+        }
+
     }
 
-    [HarmonyPatch(typeof(CollectionsMassCalculator), nameof(CollectionsMassCalculator.MassUsage), new[] { typeof(List<ThingCount>), typeof(IgnorePawnsInventoryMode), typeof(bool), typeof(bool) })]
+    [HarmonyPatch(typeof(CollectionsMassCalculator))]
     public static class CaravanPatch_MassUsage
     {
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
+        // Target both overloads.
+        [HarmonyPatch(nameof(CollectionsMassCalculator.MassUsage), new[] { typeof(List<ThingCount>), typeof(IgnorePawnsInventoryMode), typeof(bool), typeof(bool) })]
+        [HarmonyPatch(nameof(CollectionsMassCalculator.MassUsage), new[] { typeof(ThingOwner), typeof(IgnorePawnsInventoryMode), typeof(bool), typeof(bool) })]
 
-            MethodInfo statValue = AccessTools.Method(typeof(StatExtension), nameof(StatExtension.GetStatValue), new[] { typeof(Thing), typeof(StatDef), typeof(bool), typeof(int)});
+        // Replace the Mass stat calculation with our fractional-mass contribution.
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> PatchMassUsage(IEnumerable<CodeInstruction> instructions, MethodBase __originalMethod)
+        {
+            // Bool to track which overload we're on.
+            bool isThingCountOverload = __originalMethod.GetParameters()[0].ParameterType == typeof(List<ThingCount>);
+
+            int thingLocal = isThingCountOverload ? 3 : 2;
+            int countLocal = isThingCountOverload ? 2 : 3;
+
+            // Create target method and target field for transpiler splice.
+            MethodInfo statValue = AccessTools.Method(typeof(StatExtension), nameof(StatExtension.GetStatValue), new[] { typeof(Thing), typeof(StatDef), typeof(bool), typeof(int) });
+            FieldInfo massFieldInfo = AccessTools.Field(typeof(RimWorld.StatDefOf), "Mass");
 
             var codes = new List<CodeInstruction>(instructions);
 
-            for (int i = 0; i < codes.Count; i++)
+            for (int i = 1; i < codes.Count - 7; i++)
             {
-                if (codes[i + 3].opcode == OpCodes.Call && codes[i + 3].operand is MethodInfo method && method.Name == nameof(StatExtension.GetStatValue) &&
-                    method.DeclaringType == typeof(StatExtension) && (codes[i - 1].opcode == OpCodes.Ldloc_S || codes[i - 1].opcode == OpCodes.Ldloc))
+
+                // OLD C#: num += thing.GetStatValue(StatDefOf.Mass) * (float)count;
+                // NEW C#: num += CaravanPatch.GetActualMassContribution(thing, count);
+                if (codes[i + 3].Calls(statValue) && codes[i].LoadsField(massFieldInfo) && LoadsTargetLocal(codes[i - 1], thingLocal))
                 {
-                    // Verify local index 3 regardless of operand box type (LocalBuilder, LocalVariableInfo, int, etc.)
-                    int localIndex = -1;
-                    if (codes[i - 1].operand is LocalVariableInfo lvi)
-                        localIndex = lvi.LocalIndex;
-                    else if (codes[i - 1].operand != null && int.TryParse(codes[i - 1].operand.ToString(), out int parsed))
-                        localIndex = parsed;
 
-                    if (localIndex == 3)
-                    {
-                        // Replace IL_0083: ldsfld .StatDefOf::Mass with ldloc.2
-                        codes[i] = CodeInstruction.LoadLocal(2);
+                    // Replace IL_0083/IL_0074: (ldsfld) .StatDefOf::Mass with ldloc.2/ldloc.3.
+                    codes[i] = CodeInstruction.LoadLocal(countLocal);
 
-                        // Replace IL_0088: ldc.i4.1 with .Call our method.
-                        codes[i + 1] = CodeInstruction.Call(typeof(CaravanPatch), nameof(CaravanPatch.GetActualMassContribution));
+                    // Replace IL_0088/IL_0079: (ldc.i4.1) with .Call our method.
+                    codes[i + 1] = CodeInstruction.Call(typeof(CaravanPatch), nameof(CaravanPatch.GetActualMassContribution));
 
-                        // Remove IL_0089, IL_008a, IL_008f, IL_0090, IL_0091
-                        codes.RemoveRange((i + 2), 5);
-                    }
+                    // Remove IL_0089/IL_007a, IL_008a/IL_007b, IL_008f/IL_0080, IL_0090/IL_0081, IL_0091/IL_0082.
+                    codes.RemoveRange((i + 2), 5);
+                    break;
                 }
             }
             return codes;
+        }
+
+        private static bool LoadsTargetLocal(CodeInstruction instruction, int localIndex)
+        {
+            if (localIndex == 2)
+                return instruction.opcode == OpCodes.Ldloc_2;
+
+            if (localIndex == 3)
+                return instruction.opcode == OpCodes.Ldloc_3;
+
+            return false;
         }
     }
 

@@ -2,41 +2,53 @@
 using RimWorld;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Reflection.Emit;
 using UnityEngine;
 using Verse;
 
 namespace FoodTracker
 {
-    // Converts Vanilla instruction | label = ToStringMoney(priceFor, null) to label = GetTradePriceLabel(priceFor, trad);
-    [HarmonyPatch(typeof(TradeUI), "DrawPrice")]
+    
+    [HarmonyPatch(typeof(TradeUI), "DrawPrice", new[] { typeof(Rect), typeof(Tradeable), typeof(TradeAction)})]
     public static class TradePatch_DrawPrice
     {
         [HarmonyTranspiler]
         public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
 
-            // Target method Verse.GenText.ToStringMoney(float, string)
-            MethodInfo targetMethod = AccessTools.Method(typeof(GenText), nameof(GenText.ToStringMoney), new[] { typeof(float), typeof(string) });
+            // Target method System.Single.ToString().
+            // Target method Verse.GenText.ToStringMoney(float, string).
+            MethodInfo toString = AccessTools.Method(typeof(float), nameof(float.ToString));
+            MethodInfo toStringMoney = AccessTools.Method(typeof(GenText), nameof(GenText.ToStringMoney), new[] { typeof(float), typeof(string) });
 
             var codes = new List<CodeInstruction>(instructions);
 
             // Iterate through the IL instructions in DrawPrice().
-            for (int i = 0; i < codes.Count; i++)
+            for (int i = 1; i < codes.Count - 5; i++)
             {
                 CodeInstruction code = codes[i];
 
-                // Find the target method inside the IL instructions.
-                if (code.opcode == OpCodes.Call && code.operand is MethodInfo method && method.MetadataToken == targetMethod.MetadataToken)
+                // OLD C#: string label = ((TradeSession.TradeCurrency == TradeCurrency.Silver) ? priceFor.ToStringMoney() : priceFor.ToString());
+                // NEW C#: string label = ((TradeSession.TradeCurrency == TradeCurrency.Silver) ? GetTradePriceLabel(priceFor, trad) : GetTradePriceLabel(priceFor, trad));
+                if (codes[i].Calls(toString) && codes[i + 4].Calls(toStringMoney))
                 {
-                    // Go back a code instruction to the ldnull to change it to ldarg.1, create a new CodeInstruction with OpCode of Ldarg.1
-                    codes[i - 1] = new CodeInstruction(OpCodes.Ldarg_1);
+                    // Replace IL_01fe: (ldloca.s 1) with ldloc.1.
+                    codes[i - 1] = CodeInstruction.LoadLocal(1);
 
-                    // Create replacement CodeInstruction for the target method.
-                    codes[i] = CodeInstruction.Call(typeof(TradePatch), nameof(TradePatch.GetTradePriceLabel));
+                    // Insert ldarg.1 at IL_0200 (call.ToString), which shifts the list forward 1.
+                    codes.Insert(i, CodeInstruction.LoadArgument(1));
+
+                    // Replace IL_0205 (call with our method call.
+                    codes[i + 1] = CodeInstruction.Call(typeof(TradePatch), nameof(TradePatch.GetTradePriceLabelNonSilver));
+
+                    // Replace IL_0209 ldnull with ldarg.1.
+                    codes[i + 4] = CodeInstruction.LoadArgument(1);
+
+                    // Replace IL_020e (call.ToStringMoney) with our method call.
+                    codes[i + 5] = CodeInstruction.Call(typeof(TradePatch), nameof(TradePatch.GetTradePriceLabel));
+
+                    break;
                 }
             }
-
             return codes;
         }
     }
@@ -76,10 +88,18 @@ namespace FoodTracker
 
             Thing thing = trad?.AnyThing;
 
-            if (thing != null && thing?.TryGetComp<CompFoodTracker>() != null)
+            if (thing?.TryGetComp<CompFoodTracker>() != null)
                 return "(varies)";
 
             return priceFor.ToStringMoney(null);
+        }
+
+        public static string GetTradePriceLabelNonSilver(float priceFor, Tradeable trad)
+        {
+            if (trad?.AnyThing?.TryGetComp<CompFoodTracker>() != null)
+                return "(varies)";
+
+            return priceFor.ToString();
         }
 
         public static float CalculateFoodTrackerTradePrice(Tradeable tradeable, float vanillaResult)
