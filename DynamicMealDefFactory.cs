@@ -1,11 +1,25 @@
-﻿using RimWorld;
+﻿using HarmonyLib;
+using RimWorld;
 using System.Collections.Generic;
-using System.Reflection.Emit;
-using System.Xml;
 using Verse;
 
 namespace FoodTracker
 {
+    [HarmonyPatch(typeof(ThingFilter), nameof(ThingFilter.Allows), typeof(ThingDef))]
+    public static class FoodTrackerPatch_ThingFilterAllows
+    {
+        public static bool Prefix(ThingDef def, ref bool __result)
+        {
+            if (def != null && def.defName.StartsWith(DynamicMealDefFactory.Prefix))
+            {
+                __result = true;
+                return false;
+            }
+
+            return true;
+        }
+    }
+
     public static class DynamicMealDefFactory
     {
         public const string Prefix = "FoodTracker_";
@@ -32,11 +46,13 @@ namespace FoodTracker
 
             ThingDef childDef = Gen.MemberwiseClone(mealDef);
 
+            // Create a new FT defName, description and label.
             childDef.defName = newDefName;
             childDef.description = mealDef.description + " (Partial)";
             childDef.label = mealDef.label + " (Partial)";
             childDef.ClearCachedData();
 
+            // Add the FT tracking component.
             if (mealDef.comps != null)
                 childDef.comps = new List<CompProperties>(mealDef.comps);
             else
@@ -44,6 +60,23 @@ namespace FoodTracker
 
             childDef.comps.Add(new CompProperties_FoodTracker());
 
+            // Add new def to the virtual defs list of it's parent.
+            childDef.virtualDefs = new List<ThingDef>();
+
+            if (!mealDef.virtualDefs.Contains(childDef))
+                mealDef.virtualDefs.Add(childDef);
+
+            childDef.virtualDefParent = mealDef;
+
+            // Access the Food Restriction database and iterate through Food Restrictions to allow FT defs.
+            FoodRestrictionDatabase database = Current.Game.foodRestrictionDatabase;
+
+            foreach (FoodPolicy policy in database.AllFoodRestrictions)
+            {
+                policy.filter.SetAllow(mealDef, true);
+            }
+
+            // Register the defs short hash, references, and thing categories.
             RegisterGeneratedThingDef(childDef);
 
             if (!loadingFromSave)
@@ -60,7 +93,7 @@ namespace FoodTracker
             return childDef;
         }
 
-        // Everything needed to resolve references, short hash, adding the def to the database, and repopulating ThingCategory's
+        // Everything needed to resolve references, short hash, adding the def to the database, and repopulating Thing Categories.
         private static void RegisterGeneratedThingDef(ThingDef childDef)
         {
 

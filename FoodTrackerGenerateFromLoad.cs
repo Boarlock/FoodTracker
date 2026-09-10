@@ -12,6 +12,7 @@ namespace FoodTracker
     [HarmonyPatch(typeof(Game), "ExposeSmallComponents")]
     public static class GameExposeSmallComponentsPatch
     {
+
         public static void Prefix(Game __instance)
         {
             if (Scribe.mode != LoadSaveMode.LoadingVars)
@@ -35,8 +36,7 @@ namespace FoodTracker
             if (FoodTrackerGameComponent.DiscoveredGeneratedDefs.Count == 0)
                 return;
 
-            foreach (string defName in
-                     FoodTrackerGameComponent.DiscoveredGeneratedDefs)
+            foreach (string defName in FoodTrackerGameComponent.DiscoveredGeneratedDefs)
             {
                 if (!component.GeneratedDefNames.Contains(defName))
                     component.GeneratedDefNames.Add(defName);

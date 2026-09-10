@@ -1,4 +1,7 @@
 ﻿using HarmonyLib;
+using RimWorld;
+using RimWorld.Planet;
+using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 using Verse;
@@ -18,7 +21,7 @@ namespace FoodTracker
             harmony.PatchAll();
 
             // 3. Log Initialization
-            Log.Message($"[FoodTracker][T0] Initialization completed.");
+            Log.Message($"[FoodTracker] Initialization completed.");
 
         }
 

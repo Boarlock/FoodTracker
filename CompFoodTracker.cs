@@ -55,33 +55,8 @@ namespace FoodTracker
             if (parent.stackCount <= 0)
                 return;
 
-            // SINGLETON STATE
-            if (parent.stackCount == 1)
-            {
-                remainingFractions.Clear();
+            CompFoodTrackerUtility.NormalizeState(parent);
 
-                if (thisMealFraction < 0f)
-                {
-                    thisMealFraction = 1f;
-                }
-
-                return;
-            }
-
-            // STACK STATE
-            thisMealFraction = -1f;
-
-            // Existing per-item nutrition is already valid.
-            if (remainingFractions.Count == parent.stackCount)
-                return;
-
-            // Otherwise initialize the stack.
-            remainingFractions.Clear();
-
-            for (int i = 0; i < parent.stackCount; i++)
-            {
-                remainingFractions.Add(1f);
-            }
         }
 
         public override void PostExposeData()
@@ -181,6 +156,43 @@ namespace FoodTracker
             // Migration is complete.
             oldNutritionThisMeal = -1f;
             oldNutritionEntries = null;
+        }
+    }
+
+    public static class CompFoodTrackerUtility
+    {
+        /// Enforces mutual exclusivity between PartialFraction and RemainingFractions, repairs invalid states.
+        public static void NormalizeState(Thing thing)
+        {
+            CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
+
+            if (tracker != null)
+                return;
+
+            // SINGLETON STATE
+            if (thing.stackCount == 1)
+            {
+                tracker.RemainingFractions.Clear();
+                if (tracker.PartialFraction <= 0f)
+                {
+                    tracker.PartialFraction = 1f;
+                }
+                return;
+            }
+
+            // STACK STATE
+            tracker.PartialFraction = -1f;
+
+            // Existing per-item nutrition array length matches physical stack
+            if (tracker.RemainingFractions.Count == thing.stackCount)
+                return;
+
+            // Otherwise repair/initialize the stack
+            tracker.RemainingFractions.Clear();
+            for (int i = 0; i < thing.stackCount; i++)
+            {
+                tracker.RemainingFractions.Add(1f);
+            }
         }
     }
 

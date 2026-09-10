@@ -40,33 +40,6 @@ namespace FoodTracker
             }
         }
 
-        public static int GetDrugBaseIngestTicks(ThingDef def)
-        {
-            switch (def.defName)
-            {
-                case "Ambrosia":
-                    return 100;
-
-                case "Beer":
-                    return 120;
-
-                case "PsychiteTea":
-                    return 210;
-
-                case "SmokeleafJoint":
-                    return 720;
-
-                case "GoJuice":
-                    return 100;
-
-                case "Flake":
-                    return 650;
-
-                default:
-                    return 0;
-            }
-        }
-
         // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
         public static ThingDef GetOriginalDef(ThingDef objDef)
         {

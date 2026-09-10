@@ -19,19 +19,23 @@ namespace FoodTracker
         public static void Prefix(Pawn chewer, ref float durationMultiplier, TargetIndex ingestibleInd, ref IngestionState __state)
         {
             // Get the job, original food, original def, and tracker def.
-            Job curJob = chewer.CurJob;
+            Job curJob = chewer?.CurJob;
+
+            if (curJob == null || chewer == null)
+                return;
+
             Thing obj = curJob?.GetTarget(ingestibleInd).Thing;
-            ThingDef trackerDef = DynamicMealDefFactory.CreateTrackerMeal(obj.def);
 
-            if (obj == null || chewer == null)
+            if (obj == null)
                 return;
 
-            if (!obj.def.IsNutritionGivingIngestible && FoodTrackingHelpers.GetDrugType(obj.def) == FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported)
-                return;
+            bool isSupportedDrug = FoodTrackingHelpers.GetDrugType(obj.def) != FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported;
 
-            bool isDrug = (FoodTrackingHelpers.GetDrugType(obj.def) != FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported);
+            if (!obj.def.IsNutritionGivingIngestible && !isSupportedDrug)
+                return;
 
             // Get the FoodTracker and Ingredients components if they exist.
+            ThingDef trackerDef = DynamicMealDefFactory.CreateTrackerMeal(obj.def);
             CompFoodTracker tracker = obj.TryGetComp<CompFoodTracker>();
             CompIngredients ingredients = obj.TryGetComp<CompIngredients>();
 
@@ -82,7 +86,7 @@ namespace FoodTracker
             {
                 TraceID = ++nextTraceId, // Increment the trace ID for each ingestion.
 
-                IsDrug = isDrug, // Bool to track if current ingestion is a food or drug item.
+                IsDrug = isSupportedDrug, // Bool to track if current ingestion is a food or drug item.
 
                 Pawn = chewer, // The pawn who is eating the food.
 
@@ -105,7 +109,7 @@ namespace FoodTracker
                 IngredientsBefore = ingredientsBefore  // The ingredients of the food before ingestion, if it has a CompIngredients component.
             };
 
-            float minimumMultiplier = 40f / FoodTrackingHelpers.GetDrugBaseIngestTicks(obj.def);
+            float minimumMultiplier = 40f / obj.def.ingestible.baseIngestTicks;
 
             // Eating duration is based on the actual total amount being consumed.
             if (tracker != null)
