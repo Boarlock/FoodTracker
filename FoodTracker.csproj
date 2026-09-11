@@ -13,6 +13,10 @@
   </ItemGroup>
 	        
   <ItemGroup>
+    <Compile Remove="--obsolete--DestroyedFoodRecovery.cs" />
+  </ItemGroup>
+	        
+  <ItemGroup>
     <None Include=".github\copilot-instructions.md" />
   </ItemGroup>
 
@@ -28,11 +32,10 @@
       <HintPath>Lib\0Harmony.dll</HintPath>
     </Reference>
     <Reference Include="Assembly-CSharp">
-      <HintPath>..\..\..\..\..\..\Games\Rimworld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
     </Reference>
-	  
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>..\..\..\..\..\..\Games\Rimworld\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
     </Reference>
   </ItemGroup>
 

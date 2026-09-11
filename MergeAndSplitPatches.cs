@@ -223,17 +223,10 @@ namespace FoodTracker
 
             try
             {
-                
+
                 // Bootstrap any uninitialized singleton FT meals. This mirrors CompFoodTracker.PostSpawnSetup initialization.
-                if (__state.TargetFractionHistory.Count == 0 && __state.TargetPartialFraction < 0f)
-                {
-                    __state.TargetPartialFraction = 1f;
-                }
-                else if
-                    (__state.SourceFractionHistory.Count == 0 && __state.SourcePartialFraction < 0f)
-                {
-                    __state.SourcePartialFraction = 1f;
-                }
+                CompFoodTrackerUtility.NormalizeState(__instance);
+                CompFoodTrackerUtility.NormalizeState(other);
 
                 // Stack merge case: If both stacks had more than one item, we need to append the FractionEntries lists both ways..
                 if (__state.TargetStackBefore > 1 && __state.SourceStackBefore > 1)

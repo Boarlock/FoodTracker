@@ -166,7 +166,7 @@ namespace FoodTracker
         {
             CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
 
-            if (tracker != null)
+            if (tracker == null)
                 return;
 
             // SINGLETON STATE

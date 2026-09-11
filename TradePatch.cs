@@ -25,7 +25,6 @@ namespace FoodTracker
             // Iterate through the IL instructions in DrawPrice().
             for (int i = 1; i < codes.Count - 5; i++)
             {
-                CodeInstruction code = codes[i];
 
                 // OLD C#: string label = ((TradeSession.TradeCurrency == TradeCurrency.Silver) ? priceFor.ToStringMoney() : priceFor.ToString());
                 // NEW C#: string label = ((TradeSession.TradeCurrency == TradeCurrency.Silver) ? GetTradePriceLabel(priceFor, trad) : GetTradePriceLabel(priceFor, trad));

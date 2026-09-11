@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Verse;
+using static RimWorld.FleshTypeDef;
 
 namespace FoodTracker
 {
@@ -24,6 +25,7 @@ namespace FoodTracker
         public ThingDef ObjectTrackerDef;
         public int IngestCount;
         public int PreStackCount;
+        public int ThingID;
         public float TotalFraction;
 
         // Captured after vanilla initializes the toil.
@@ -39,8 +41,7 @@ namespace FoodTracker
 
     public static class FoodTrackerIngestionTracker
     {
-        private static readonly Dictionary<Pawn, IngestionState> active =
-            new Dictionary<Pawn, IngestionState>();
+        private static readonly Dictionary<Pawn, IngestionState> active = new Dictionary<Pawn, IngestionState>();
 
         public static void Register(IngestionState state)
         {
@@ -52,13 +53,32 @@ namespace FoodTracker
 
         public static bool TryGet(Pawn pawn, out IngestionState state)
         {
-            return active.TryGetValue(pawn, out state);
+            bool found = active.TryGetValue(pawn, out state);
+
+            return found;
         }
 
         public static void Remove(Pawn pawn)
         {
             if (pawn != null)
                 active.Remove(pawn);
+        }
+
+
+        public static bool IsBeingIngested(Thing thing, out IngestionState state)
+        {
+            state = null;
+            if (thing == null) return false;
+
+            foreach (var kvp in active)
+            {
+                if (kvp.Value != null && kvp.Value.ThingID == thing.thingIDNumber)
+                {
+                    state = kvp.Value;
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

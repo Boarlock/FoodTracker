@@ -5,7 +5,7 @@ using static RimWorld.Planet.DaysWorthOfFoodCalculator;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Reflection.Emit;
+using System.Linq;
 using UnityEngine;
 using Verse;
 
@@ -16,6 +16,7 @@ namespace FoodTracker
         typeof(IgnorePawnsInventoryMode), typeof(Faction), typeof(WorldPath), typeof(float), typeof(int), typeof(bool)})]
     public static class DaysWorthOfFoodCalculatorPatch
     {
+        private static int runCounter = 0;
 
         private delegate int BestEverEdibleFoodIndexFor(Pawn pawn, List<ThingDefCount> food);
         private static BestEverEdibleFoodIndexFor CallBestEverEdibleFoodIndexFor;
@@ -32,17 +33,20 @@ namespace FoodTracker
             int caravanTicksPerMove,
             bool assumeCaravanMoving,
             ref float __result,
-            List<ThingDefCount> ___food,
-            List<float> ___maxFoodLevel,
-            List<float> ___nutritionBetweenHungryAndFed,
-            List<int> ___ticksUntilHungryWhenFed,
-            List<float> ___daysWorthOfFoodPerPawn,
-            List<ThingDefCount> ___foodCopy,
-            List<Pawn> ___lactatingPawns,
-            List<(PlanetTile, int)> ___ticksToArrive,
+            List<ThingDefCount> ___tmpFood,
+            List<float> ___cachedMaxFoodLevel,
+            List<float> ___cachedNutritionBetweenHungryAndFed,
+            List<int> ___cachedTicksUntilHungryWhenFed,
+            List<float> ___tmpDaysWorthOfFoodForPawn,
+            List<ThingDefCount> ___tmpFood2,
+            List<Pawn> ___tmpLactatingPawns,
+            List<(PlanetTile, int)> ___tmpTicksToArrive,
             HashSet<Pawn> ___babiesWithFeeders)
 
         {
+            runCounter++;
+            int currentRunId = runCounter;
+
             // BestEverEdibleFoodIndexFor is private in vanilla. Create the delegate once,
             // then reuse it for every food-consumption check.
             if (CallBestEverEdibleFoodIndexFor == null)
@@ -64,8 +68,18 @@ namespace FoodTracker
                 path = null;
             }
 
-            // Collect food from the explicit extra-food list and from pawn inventories.
-            ___food.Clear();
+            // DICTIONARY CREATION, HASHSET CREATION
+            // FOODTRACKER LOGIC BEGINS HERE
+            // Dictionary to store each ThingDef, it's total count and total fractional amount.
+            Dictionary<ThingDef, FTFoodTotal> ftFoodTotalsBaseline = new Dictionary<ThingDef, FTFoodTotal>();
+
+            // HashSet to not add duplicate Thing ID's to the simulations
+            HashSet<int> addedThingIDs = new HashSet<int>();
+
+            // Collect food from the explicit extra food list and from pawn inventories.
+            ___tmpFood.Clear();
+
+            // Extra food we don't need to account for as it has the same source from our transferables.
             if (extraFood != null)
             {
                 for (int extraFoodIndex = 0; extraFoodIndex < extraFood.Count; extraFoodIndex++)
@@ -73,11 +87,12 @@ namespace FoodTracker
                     ThingDefCount foodCount = extraFood[extraFoodIndex];
                     if (foodCount.ThingDef.IsNutritionGivingIngestible && foodCount.Count > 0)
                     {
-                        ___food.Add(foodCount);
+                        ___tmpFood.Add(foodCount);
                     }
                 }
             }
 
+            // We need to account for food in pawn's inventories.
             for (int pawnIndex = 0; pawnIndex < pawns.Count; pawnIndex++)
             {
                 Pawn pawn = pawns[pawnIndex];
@@ -87,31 +102,84 @@ namespace FoodTracker
                 }
 
                 ThingOwner<Thing> inventory = pawn.inventory.innerContainer;
-                for (int inventoryIndex = 0; inventoryIndex < inventory.Count; inventoryIndex++)
+                for (int i = 0; i < inventory.Count; i++)
                 {
-                    Thing thing = inventory[inventoryIndex];
+                    Thing thing = inventory[i];
+                    
                     if (thing.def.IsNutritionGivingIngestible)
                     {
-                        ___food.Add(new ThingDefCount(thing.def, thing.stackCount));
+                        ___tmpFood.Add(new ThingDefCount(thing.def, thing.stackCount));
+                    }
+
+                    CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
+
+                    if (tracker == null)
+                        continue;
+
+                    if (!addedThingIDs.Add(thing.thingIDNumber))
+                        continue;
+
+                    if (ftFoodTotalsBaseline.TryGetValue(thing.def, out FTFoodTotal totals))
+                    {
+                        if (tracker.RemainingFractions.Count > 0)
+                        {
+                            for (int j = 0; j < tracker.RemainingFractions.Count; j++)
+                            {
+                                totals.TotalFractions += tracker.RemainingFractions[j];
+                                totals.Total++;
+                            }
+                        }
+                        else
+                        {
+                            totals.TotalFractions += tracker.PartialFraction;
+                            totals.Total++;
+                        }
+
+                        Log.Message($"[Run #{currentRunId}] INVENTORIES - ThingDef: {thing.def} - Total Count: {totals.Total} Fraction Total: {totals.TotalFractions}");
+                    }
+                    else
+                    {
+                        FTFoodTotal newTotal = new FTFoodTotal
+                        {
+                            Total = 0,
+                            TotalFractions = 0f
+                        };
+
+                        if (tracker.RemainingFractions.Count > 0)
+                        {
+                            for (int j = 0; j < tracker.RemainingFractions.Count; j++)
+                            {
+                                newTotal.TotalFractions += tracker.RemainingFractions[j];
+                                newTotal.Total++;
+                            }
+                        }
+                        else
+                        {
+                            newTotal.TotalFractions += tracker.PartialFraction;
+                            newTotal.Total++;
+                        }
+                        Log.Message($"[Run #{currentRunId}] INVENTORIES - New ThingDef Added: {thing.def} - Total Count: {newTotal.Total} Fraction Total: {newTotal.TotalFractions}");
+
+                        ftFoodTotalsBaseline.Add(thing.def, newTotal);
                     }
                 }
             }
 
             // Merge duplicate food definitions so each definition has one total count.
-            ___foodCopy.Clear();
-            ___foodCopy.AddRange(___food);
-            ___food.Clear();
+            ___tmpFood2.Clear();
+            ___tmpFood2.AddRange(___tmpFood);
+            ___tmpFood.Clear();
 
-            for (int i = 0; i < ___foodCopy.Count; i++)
+            for (int i = 0; i < ___tmpFood2.Count; i++)
             {
-                ThingDefCount copiedFood = ___foodCopy[i];
+                ThingDefCount copiedFood = ___tmpFood2[i];
                 bool foodDefinitionAlreadyAdded = false;
-                for (int j = 0; j < ___food.Count; j++)
+                for (int j = 0; j < ___tmpFood.Count; j++)
                 {
-                    ThingDefCount existingFood = ___food[j];
+                    ThingDefCount existingFood = ___tmpFood[j];
                     if (existingFood.ThingDef == copiedFood.ThingDef)
                     {
-                        ___food[j] = existingFood.WithCount(existingFood.Count + copiedFood.Count);
+                        ___tmpFood[j] = existingFood.WithCount(existingFood.Count + copiedFood.Count);
                         foodDefinitionAlreadyAdded = true;
                         break;
                     }
@@ -119,44 +187,44 @@ namespace FoodTracker
 
                 if (!foodDefinitionAlreadyAdded)
                 {
-                    ___food.Add(copiedFood);
+                    ___tmpFood.Add(copiedFood);
                 }
             }
 
             // Prepare one accumulated food-days value for each pawn.
-            ___daysWorthOfFoodPerPawn.Clear();
+            ___tmpDaysWorthOfFoodForPawn.Clear();
             for (int pawnIndex = 0; pawnIndex < pawns.Count; pawnIndex++)
             {
-                ___daysWorthOfFoodPerPawn.Add(0f);
+                ___tmpDaysWorthOfFoodForPawn.Add(0f);
             }
 
             // Calculate where the caravan will be at each point in the simulation.
             int ticksAbs = Find.TickManager.TicksAbs;
-            ___ticksToArrive.Clear();
+            ___tmpTicksToArrive.Clear();
             if (path != null && path.Found)
             {
-                CaravanArrivalTimeEstimator.EstimatedTicksToArriveToEvery(tile, path.LastNode, path, nextTileCostLeft, caravanTicksPerMove, ticksAbs, ___ticksToArrive);
+                CaravanArrivalTimeEstimator.EstimatedTicksToArriveToEvery(tile, path.LastNode, path, nextTileCostLeft, caravanTicksPerMove, ticksAbs, ___tmpTicksToArrive);
             }
 
             // Cache each pawn's food-need values. The lists must remain aligned with pawns.
-            ___nutritionBetweenHungryAndFed.Clear();
-            ___ticksUntilHungryWhenFed.Clear();
-            ___maxFoodLevel.Clear();
+            ___cachedNutritionBetweenHungryAndFed.Clear();
+            ___cachedTicksUntilHungryWhenFed.Clear();
+            ___cachedMaxFoodLevel.Clear();
             for (int i = 0; i < pawns.Count; i++)
             {
                 Pawn pawn = pawns[i];
                 if (pawn.RaceProps.EatsFood && pawn.needs.food != null)
                 {
                     Need_Food foodNeed = pawn.needs.food;
-                    ___nutritionBetweenHungryAndFed.Add(foodNeed.NutritionBetweenHungryAndFed);
-                    ___ticksUntilHungryWhenFed.Add(foodNeed.TicksUntilHungryWhenFedIgnoringMalnutrition);
-                    ___maxFoodLevel.Add(foodNeed.MaxLevel);
+                    ___cachedNutritionBetweenHungryAndFed.Add(foodNeed.NutritionBetweenHungryAndFed);
+                    ___cachedTicksUntilHungryWhenFed.Add(foodNeed.TicksUntilHungryWhenFedIgnoringMalnutrition);
+                    ___cachedMaxFoodLevel.Add(foodNeed.MaxLevel);
                 }
                 else
                 {
-                    ___nutritionBetweenHungryAndFed.Add(0f);
-                    ___ticksUntilHungryWhenFed.Add(0);
-                    ___maxFoodLevel.Add(0f);
+                    ___cachedNutritionBetweenHungryAndFed.Add(0f);
+                    ___cachedTicksUntilHungryWhenFed.Add(0);
+                    ___cachedMaxFoodLevel.Add(0f);
                 }
             }
 
@@ -168,37 +236,37 @@ namespace FoodTracker
 
             // Remove babies who already have an available feeder from the food calculation.
             ___babiesWithFeeders.Clear();
-            ___lactatingPawns.Clear();
-            ___lactatingPawns.AddRange(pawns);
-            ___lactatingPawns.RemoveAll((Pawn mom) => !ChildcareUtility.CanBreastfeed(mom, out var _));
+            ___tmpLactatingPawns.Clear();
+            ___tmpLactatingPawns.AddRange(pawns);
+            ___tmpLactatingPawns.RemoveAll((Pawn mom) => !ChildcareUtility.CanBreastfeed(mom, out var _));
 
             // Vanilla adds one extra feeder slot for each lactating pawn.
-            int initialLactatingPawnCount = ___lactatingPawns.Count;
+            int initialLactatingPawnCount = ___tmpLactatingPawns.Count;
             for (int lactatingPawnIndex = 0; lactatingPawnIndex < initialLactatingPawnCount; lactatingPawnIndex++)
             {
-                ___lactatingPawns.Add(___lactatingPawns[lactatingPawnIndex]);
+                ___tmpLactatingPawns.Add(___tmpLactatingPawns[lactatingPawnIndex]);
             }
 
             foreach (Pawn baby in pawns)
             {
                 if (ChildcareUtility.CanSuckle(baby, out var _))
                 {
-                    int feederIndex = ___lactatingPawns.FindIndex((Pawn feeder) => ChildcareUtility.CanMomBreastfeedBaby(feeder, baby, out var _) && baby.mindState.AutofeedSetting(feeder) != AutofeedMode.Never);
+                    int feederIndex = ___tmpLactatingPawns.FindIndex((Pawn feeder) => ChildcareUtility.CanMomBreastfeedBaby(feeder, baby, out var _) && baby.mindState.AutofeedSetting(feeder) != AutofeedMode.Never);
                     if (feederIndex >= 0)
                     {
-                        ___lactatingPawns[feederIndex] = null;
+                        ___tmpLactatingPawns[feederIndex] = null;
                         ___babiesWithFeeders.Add(baby);
                     }
                 }
             }
 
+            // THINGDEF HASHSET CREATION, TRANSFERABLE POPULATION
             // FOODTRACKER LOGIC BEGINS HERE
-            //
-            //
             // Collect FT ThingDefs into a HashSet for O(1) fast lookups. HashSet eliminates the need to index or iterate over thingDefList later.
             HashSet<ThingDef> ftThingDefs = new HashSet<ThingDef>();
 
-            foreach (ThingDefCount item in ___food)
+            // Compile each ThingDef in ___tmpFood.
+            foreach (ThingDefCount item in ___tmpFood)
             {
                 if (item.ThingDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
                 {
@@ -206,10 +274,7 @@ namespace FoodTracker
                 }
             }
 
-            // Dictionary to store each ThingDef, it's total count and total fractional amount.
-            Dictionary<ThingDef, FTFoodTotal> ftFoodTotals = new Dictionary<ThingDef, FTFoodTotal>();
-
-            // Loop through trackedTransferables once.
+            // Loop through trackedTransferables to track all possible FT meals that can exist in a given simulation.
             foreach (var pair in CaravanPatch.trackedTransferables)
             {
                 List<Thing> things = pair.Value;
@@ -219,17 +284,17 @@ namespace FoodTracker
 
                 for (int i = 0; i < things.Count; i++)
                 {
-                    // Iterate through individual Thing object inside the list.
                     Thing thing = things[i];
+
+                    if (!addedThingIDs.Add(thing.thingIDNumber))
+                        continue;
 
                     // Fast O(1) hash set check.
                     if (ftThingDefs.Contains(thing.def))
                     {
                         // If our dictionary contains this ThingDef.
-                        if (ftFoodTotals.TryGetValue(thing.def, out FTFoodTotal totals))
+                        if (ftFoodTotalsBaseline.TryGetValue(thing.def, out FTFoodTotal totals))
                         {
-
-                            totals.Total += 1;
 
                             CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
 
@@ -237,21 +302,29 @@ namespace FoodTracker
                             {
                                 // Add tracked nutrition data to the total.
                                 if (tracker.RemainingFractions.Count > 0)
+                                {
                                     for (int j = 0; j < tracker.RemainingFractions.Count; j++)
+                                    {
                                         totals.TotalFractions += tracker.RemainingFractions[j];
+                                        totals.Total++;
+                                    }
+                                }
                                 else
+                                {
                                     totals.TotalFractions += tracker.PartialFraction;
+                                    totals.Total++;
+                                }
                             }
+                            Log.Message($"[Run #{currentRunId}] TRANSFERABLES - ThingDef: {thing.def} - Total Count: {totals.Total} Fraction Total: {totals.TotalFractions}");
 
                             continue;
                         }
                         // If our dictionary doesn't contain this ThingDef add it.
                         else
                         {
-
                             FTFoodTotal newTotal = new FTFoodTotal
                             {
-                                Total = 1,
+                                Total = 0,
                                 TotalFractions = 0f
                             };
 
@@ -262,26 +335,44 @@ namespace FoodTracker
                                 // Add tracked nutrition data to the total.
                                 if (tracker.RemainingFractions.Count > 0)
                                     for (int j = 0; j < tracker.RemainingFractions.Count; j++)
+                                    {
                                         newTotal.TotalFractions += tracker.RemainingFractions[j];
+                                        newTotal.Total++;
+                                    }
                                 else
+                                {
                                     newTotal.TotalFractions += tracker.PartialFraction;
+                                    newTotal.Total++;
+                                }
                             }
+                            Log.Message($"[Run #{currentRunId}] TRANSFERABLES - New ThingDef Added: {thing.def} - Total Count: {newTotal.Total} Fraction Total: {newTotal.TotalFractions}");
 
-                            ftFoodTotals.Add(thing.def, newTotal);
+                            ftFoodTotalsBaseline.Add(thing.def, newTotal);
                         }
                     }
                 }
             }
+
+            // WORKING DICTIONARY CREATION
+            // FOODTRACKER LOGIC BEGINS HERE
+            Dictionary<ThingDef, FTFoodTotal> ftFoodTotalWorkingSet = ftFoodTotalsBaseline.ToDictionary(entry => entry.Key, entry => entry.Value.Clone());
+
+            int dayCount = 0;
+
+            foreach (var (key, value) in ftFoodTotalWorkingSet)
+                Log.Message($"[Run #{currentRunId}] Day {dayCount} WORKING DICTIONARY CREATION - ThingDef: {key} - Total Count: {value.Total} - Fraction Total: {value.TotalFractions}");
 
             // Simulate food consumption one food-day at a time until every pawn is fed,
             // food runs out, or the result exceeds the vanilla upper bound.
             bool foodWasConsumed;
             do
             {
+                dayCount++;
+
                 foodWasConsumed = false;
                 int ticksAtCurrentFoodDay = ticksAbs + (int)(currentDaysWorthOfFood * 60000f);
                 PlanetTile tileAtCurrentTime = path != null
-                    ? CaravanArrivalTimeEstimator.TileIllBeInAt(ticksAtCurrentFoodDay, ___ticksToArrive, ticksAbs)
+                    ? CaravanArrivalTimeEstimator.TileIllBeInAt(ticksAtCurrentFoodDay, ___tmpTicksToArrive, ticksAbs)
                     : tile;
                 bool isRestingAtTile = CaravanNightRestUtility.WouldBeRestingAt(tileAtCurrentTime, ticksAtCurrentFoodDay);
                 float progressPerTick = ForagedFoodPerDayCalculator.GetProgressPerTick(assumeCaravanMoving && !isRestingAtTile, isRestingAtTile);
@@ -296,23 +387,78 @@ namespace FoodTracker
                     if (accumulatedForageTicks >= ticksPerForageInterval)
                     {
                         BiomeDef primaryBiome = worldGrid[tileAtCurrentTime].PrimaryBiome;
+
+                        // Amount and type of food vanilla is adding.
                         int foragedFoodCount = Mathf.RoundToInt(ForagedFoodPerDayCalculator.GetForagedFoodCountPerInterval(pawns, primaryBiome, faction));
                         ThingDef foragedFood = primaryBiome.foragedFood;
+                        int foragedFoodIteration = 0;
+
+                        // Bool for FT foods.
+                        bool isFTFood = false;
+
+                        if (foragedFood.defName.StartsWith(DynamicMealDefFactory.Prefix))
+                        {
+                            isFTFood = true;
+                        }
+
                         while (accumulatedForageTicks >= ticksPerForageInterval)
                         {
+                            foragedFoodIteration++;
+
                             accumulatedForageTicks -= ticksPerForageInterval;
+
                             if (foragedFoodCount <= 0)
                             {
                                 continue;
                             }
 
-                            bool foragedFoodAlreadyAdded = false;
-                            for (int i = ___food.Count - 1; i >= 0; i--)
+                            if (isFTFood)
                             {
-                                ThingDefCount existingFood = ___food[i];
+                                float randomFraction = 0f;
+
+                                if (ftFoodTotalWorkingSet.TryGetValue(foragedFood, out FTFoodTotal totals))
+                                {
+                                    // We generate a randomized nutrition value for each scavenged food item.
+                                    for (int i = 0; i < foragedFoodCount; i++)
+                                    {
+                                        randomFraction = UnityEngine.Random.value;
+                                        totals.TotalFractions += randomFraction;
+                                        totals.Total++;
+
+                                        Log.Message($"[Run #{currentRunId}] Day {dayCount} Foraged Food {foragedFoodIteration} - ThingDef: {foragedFood} - Items Added: {foragedFoodCount} - " +
+                                            $"Total Count: {totals.Total} - Fraction Total: {totals.TotalFractions} - Random Fraction Generated: {randomFraction}");
+                                    }
+                                }
+                                else
+                                {
+                                    FTFoodTotal newTotal = new FTFoodTotal
+                                    {
+                                        Total = 0,
+                                        TotalFractions = 0f
+                                    };
+
+                                    // We generate a randomized nutrition value for each scavenged food item.
+                                    for (int i = 0; i < foragedFoodCount; i++)
+                                    {
+                                        randomFraction = UnityEngine.Random.value;
+                                        newTotal.TotalFractions += randomFraction;
+                                        newTotal.Total++;
+
+                                        Log.Message($"[Run #{currentRunId}] Day {dayCount} Foraged Food {foragedFoodIteration} NEW THINGDEF ADDED - ThingDef: {foragedFood} - " +
+                                            $"Items Added: {foragedFoodCount} - Total Count: {newTotal.Total} - Fraction Total: {newTotal.TotalFractions} - Random Fraction Generated: {randomFraction}");
+                                    }
+
+                                    ftFoodTotalWorkingSet.Add(foragedFood, newTotal);
+                                }
+                            }
+
+                            bool foragedFoodAlreadyAdded = false;
+                            for (int i = ___tmpFood.Count - 1; i >= 0; i--)
+                            {
+                                ThingDefCount existingFood = ___tmpFood[i];
                                 if (existingFood.ThingDef == foragedFood)
                                 {
-                                    ___food[i] = existingFood.WithCount(existingFood.Count + foragedFoodCount);
+                                    ___tmpFood[i] = existingFood.WithCount(existingFood.Count + foragedFoodCount);
                                     foragedFoodAlreadyAdded = true;
                                     break;
                                 }
@@ -320,7 +466,7 @@ namespace FoodTracker
 
                             if (!foragedFoodAlreadyAdded)
                             {
-                                ___food.Add(new ThingDefCount(foragedFood, foragedFoodCount));
+                                ___tmpFood.Add(new ThingDefCount(foragedFood, foragedFoodCount));
                             }
                         }
                     }
@@ -339,27 +485,29 @@ namespace FoodTracker
 
                     if (canEatVirtualPlants && VirtualPlantsUtility.CanEverEatVirtualPlants(pawn))
                     {
-                        if (___daysWorthOfFoodPerPawn[pawnIndex] < currentDaysWorthOfFood)
+                        if (___tmpDaysWorthOfFoodForPawn[pawnIndex] < currentDaysWorthOfFood)
                         {
-                            ___daysWorthOfFoodPerPawn[pawnIndex] = currentDaysWorthOfFood;
+                            ___tmpDaysWorthOfFoodForPawn[pawnIndex] = currentDaysWorthOfFood;
                         }
                         else
                         {
-                            ___daysWorthOfFoodPerPawn[pawnIndex] += 0.45f;
+                            ___tmpDaysWorthOfFoodForPawn[pawnIndex] += 0.45f;
                         }
 
                         foodWasConsumed = true;
                     }
                     else
                     {
-                        float nutritionNeeded = ___nutritionBetweenHungryAndFed[pawnIndex];
-                        int ticksUntilHungry = ___ticksUntilHungryWhenFed[pawnIndex];
+                        float nutritionNeeded = ___cachedNutritionBetweenHungryAndFed[pawnIndex];
+                        int ticksUntilHungry = ___cachedTicksUntilHungryWhenFed[pawnIndex];
                         do
                         {
-                            int foodIndex = CallBestEverEdibleFoodIndexFor(pawn, ___food);
+
+                            int foodIndex = CallBestEverEdibleFoodIndexFor(pawn, ___tmpFood);
+
                             if (foodIndex < 0)
                             {
-                                if (___daysWorthOfFoodPerPawn[pawnIndex] < currentDaysWorthOfFood)
+                                if (___tmpDaysWorthOfFoodForPawn[pawnIndex] < currentDaysWorthOfFood)
                                 {
                                     ranOutOfFood = true;
                                 }
@@ -367,61 +515,44 @@ namespace FoodTracker
                             }
 
                             // Here vanilla grabs a specific food from the list.
-                            ThingDefCount food = ___food[foodIndex];
+                            ThingDefCount food = ___tmpFood[foodIndex];
 
-                            // Bool to determine if it's a FT item or not.
+                            // FOODTRACKER LOGIC BEGINS HERE
                             bool isFTFood = food.ThingDef.defName.StartsWith(DynamicMealDefFactory.Prefix);
                             FTFoodTotal ftTotal = null;
 
-                            // Working list we use later as param to calculate Subset Sum of partial fractions.
-                            List<float> availableFractions = new List<float>();
-
                             float nutritionPerItem;
+
+                            // Get our independent FT simulation totals.
+                            ftFoodTotalWorkingSet.TryGetValue(food.ThingDef, out ftTotal);
 
                             if (isFTFood)
                             {
-                                foreach (var pair in CaravanPatch.trackedTransferables)
+
+                                // FT says this food does not exist in the simulation. Remove it from vanilla's working food list.
+                                if (ftTotal == null || ftTotal.Total <= 0)
                                 {
-                                    List<Thing> things = pair.Value;
-
-                                    if (things == null)
-                                        continue;
-
-                                    for (int i = 0; i < things.Count; i++)
-                                    {
-                                        Thing thing = things[i];
-
-                                        if (thing.def != food.ThingDef)
-                                            continue;
-
-                                        CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
-
-                                        if (tracker == null)
-                                            continue;
-
-                                        if (tracker.RemainingFractions.Count > 0)
-                                        {
-                                            for (int j = 0; j < tracker.RemainingFractions.Count; j++)
-                                            {
-                                                availableFractions.Add(tracker.RemainingFractions[j]);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            availableFractions.Add(tracker.PartialFraction);
-                                        }
-                                    }
+                                    ___tmpFood[foodIndex] = food.WithCount(0);
+                                    continue;
                                 }
 
-                                // Check if the ThingDef is in the Dictionary to use Total Values.
-                                ftFoodTotals.TryGetValue(food.ThingDef, out ftTotal);
+                                Log.Message($"[Run #{currentRunId}] Day {dayCount} PRE-COUNT CLAMP - Vanilla's Sim Count: {food.Count} - Total Count: {ftTotal.Total}");
 
-                                // Calculate an Actual Nutrition and Average Nutrition value from totals and Total Fractions.
+                                // FT Total is the absolute maximum number of units that can exist
+                                // in this simulation. Vanilla's working count cannot exceed it.
+                                if (food.Count > ftTotal.Total)
+                                {
+                                    food = food.WithCount(ftTotal.Total);
+                                    ___tmpFood[foodIndex] = food;
+                                }
+
+                                // Calculate an Actual Nutrition and Average Nutrition value from our independent FT totals.
                                 float maxNutrition = food.ThingDef.GetStatValueAbstract(StatDefOf.Nutrition);
                                 float actualNutrition = ftTotal.TotalFractions * maxNutrition;
                                 float averageNutrition = actualNutrition / ftTotal.Total;
 
                                 nutritionPerItem = Mathf.Min(averageNutrition, nutritionNeeded);
+
                             }
                             else
                             {
@@ -433,93 +564,44 @@ namespace FoodTracker
                             // Leave this calculation alone, it already factors in our modifed Nutrition Per Item.
                             float foodDaysPerItem = nutritionPerItem / nutritionNeeded * ticksUntilHungry / 60000f;
 
-                            // For FT foods use the count from the Dictionary as that's definitive.
-                            int availableItemCount = isFTFood ? ftTotal.Total : food.Count;
+                            // Vanilla's item count calculation remains intact.
+                            int itemCount = Mathf.Min(Mathf.CeilToInt(Mathf.Min(0.2f, ___cachedMaxFoodLevel[pawnIndex]) / nutritionPerItem), food.Count);
 
-                            // Items to be removed after the simulation, no modification here as it already account for our Available Item Count.
-                            int itemCount = Mathf.Min(Mathf.CeilToInt(Mathf.Min(0.2f, ___maxFoodLevel[pawnIndex]) / nutritionPerItem), availableItemCount);
+                            // Actual food-days calculation.
+                            ___tmpDaysWorthOfFoodForPawn[pawnIndex] += foodDaysPerItem * itemCount;
 
-                            // No modification is needed here, actual Food Days calculation.
-                            ___daysWorthOfFoodPerPawn[pawnIndex] += foodDaysPerItem * itemCount;
+                            // Vanilla removes itemCount from its working simulation.
+                            ___tmpFood[foodIndex] = food.WithCount(food.Count - itemCount);
 
-                            // Vanilla actually removes items from simulation, we use this to check if our Dictionary matches the new item count.
-                            ___food[foodIndex] = food.WithCount(food.Count - itemCount);
-
-                            // The sum of fractions we need to remove from our Dictionary and Transferrable
-                            // Dictionary to reflect the nutritional data that vanilla has removed from the simulation.
-                            float targetFractionTotal = (ftTotal.TotalFractions / ftTotal.Total) * itemCount;
-
-                            // List of fractions that correspond to things to be removed from Transferable Dictionary.
-                            List<float> selectedFractions = CaravanPatch.FindBestFractionsToPick(availableFractions, itemCount, targetFractionTotal);
-
-                            foreach (var pair in CaravanPatch.trackedTransferables)
+                            if (isFTFood)
                             {
-                                List<Thing> things = pair.Value;
+                                // 1. Calculate the proportional fraction weight for the items being consumed
+                                float averageFraction = ftTotal.Total > 0 ? (ftTotal.TotalFractions / ftTotal.Total) : 0f;
+                                float fractionsToRemove = averageFraction * itemCount;
 
-                                if (things == null)
-                                    continue;
+                                // 2. Update ONLY the working set copy for subsequent days in this simulation
+                                ftTotal.Total -= itemCount;
+                                ftTotal.TotalFractions -= fractionsToRemove;
 
-                                for (int i = things.Count - 1; i >= 0 && selectedFractions.Count > 0; i--)
+                                // 3. Clamp to prevent underflow
+                                if (ftTotal.Total <= 0 || ftTotal.TotalFractions <= 0f)
                                 {
-                                    Thing thing = things[i];
-
-                                    if (thing.def != food.ThingDef)
-                                        continue;
-
-                                    CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
-
-                                    if (tracker == null)
-                                        continue;
-
-                                    if (tracker.RemainingFractions.Count > 0)
-                                    {
-                                        for (int j = tracker.RemainingFractions.Count - 1; j >= 0 && selectedFractions.Count > 0; j--)
-                                        {
-                                            float currentFraction = tracker.RemainingFractions[j];
-
-                                            for (int k = selectedFractions.Count - 1; k >= 0; k--)
-                                            {
-                                                if (Mathf.Abs(currentFraction - selectedFractions[k]) < 0.005f)
-                                                {
-                                                    tracker.RemainingFractions.RemoveAt(j);
-                                                    selectedFractions.RemoveAt(k);
-                                                    break;
-                                                }
-                                            }
-                                        }
-
-                                        if (tracker.RemainingFractions.Count == 1)
-                                        {
-                                            tracker.PartialFraction = tracker.RemainingFractions[0];
-                                            tracker.RemainingFractions.Clear();
-                                        }
-                                        else if (tracker.RemainingFractions.Count == 0)
-                                        {
-                                            things.RemoveAt(i);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        for (int k = selectedFractions.Count - 1; k >= 0; k--)
-                                        {
-                                            if (Mathf.Abs(tracker.PartialFraction - selectedFractions[k]) < 0.005f)
-                                            {
-                                                selectedFractions.RemoveAt(k);
-                                                things.RemoveAt(i);
-                                                break;
-                                            }
-                                        }
-                                    }
+                                    ftTotal.Total = 0;
+                                    ftTotal.TotalFractions = 0f;
                                 }
+
+                                Log.Message($"[Run #{currentRunId}] Day {dayCount} FINISHED - Remaining Total: {ftTotal.Total} - Remaining Fractions: {ftTotal.TotalFractions} - " +
+                                $"Items Removed: {itemCount} - ThingDef: {food.ThingDef} - Average Fraction: {averageFraction} - Fractions Removed: {fractionsToRemove} - " +
+                                $"Nutrition Per Item: {nutritionPerItem} - Nutrition Needed: {nutritionNeeded} - Vanilla's Sim Count: {food.Count}");
+
                             }
 
-                            // Update our working totals for any subsequent loops.
-                            ftTotal.Total -= itemCount;
-                            ftTotal.TotalFractions -= targetFractionTotal;
+                            Log.Message($"[Run #{currentRunId}] Day {dayCount} FINISHED - Items Removed: {itemCount} - ThingDef: {food.ThingDef} - " +
+                                $"Nutrition Per Item: {nutritionPerItem} - Nutrition Needed: {nutritionNeeded} - Vanilla's Sim Count: {food.Count}");
 
                             foodWasConsumed = true;
                         }
-                        while (___daysWorthOfFoodPerPawn[pawnIndex] < currentDaysWorthOfFood);
+                        while (___tmpDaysWorthOfFoodForPawn[pawnIndex] < currentDaysWorthOfFood);
                     }
 
                     if (ranOutOfFood)
@@ -527,8 +609,9 @@ namespace FoodTracker
                         break;
                     }
 
-                    currentDaysWorthOfFood = Mathf.Max(currentDaysWorthOfFood, ___daysWorthOfFoodPerPawn[pawnIndex]);
+                    currentDaysWorthOfFood = Mathf.Max(currentDaysWorthOfFood, ___tmpDaysWorthOfFoodForPawn[pawnIndex]);
                 }
+                
             }
             while (!(!foodWasConsumed | ranOutOfFood) && !(currentDaysWorthOfFood > 601f));
 
@@ -539,11 +622,11 @@ namespace FoodTracker
                 Pawn pawn = pawns[pawnIndex];
                 if (pawn.RaceProps.EatsFood && pawn.needs?.food != null && !___babiesWithFeeders.Contains(pawn))
                 {
-                    minimumDaysWorthOfFood = Mathf.Min(minimumDaysWorthOfFood, ___daysWorthOfFoodPerPawn[pawnIndex]);
+                    minimumDaysWorthOfFood = Mathf.Min(minimumDaysWorthOfFood, ___tmpDaysWorthOfFoodForPawn[pawnIndex]);
                 }
             }
 
-            Log.Message($"[FoodTracker] Replacement ApproxDaysWorthOfFood result: {minimumDaysWorthOfFood}");
+            Log.Message($"[Run #{currentRunId}] END - Total Days: {dayCount}\n");
             __result = minimumDaysWorthOfFood;
 
             // The result above replaces the vanilla result, so skip the original method.
@@ -608,55 +691,90 @@ namespace FoodTracker
         }
     }*/
 
-    [HarmonyPatch(typeof(Dialog_FormCaravan), "AddToTransferables", new[] { typeof(Thing), typeof(bool) })]
-    public static class CaravanPatch_AddToTransferables
-    {
-
-        [HarmonyPostfix]
-        public static void Postfix(Thing t, bool setToTransferMax, List<TransferableOneWay> ___transferables)
-        {
-            // HARMONY DOES NOT LIKE ME CHANGING THING PARAM!!!
-
-            if (t == null || ___transferables == null) 
-                return;
-
-            CompFoodTracker tracker = t.TryGetComp<CompFoodTracker>();
-
-            if (tracker == null)
-                return;
-
-            // Gets the transferable Vanilla just assigned the Thing to.
-            TransferableOneWay transferable = TransferableUtility.TransferableMatching(t, ___transferables, TransferAsOneMode.PodsOrCaravanPacking);
-
-            if (transferable == null)
-                return;
-
-            // Pass over the transferrable and Thing.
-            CaravanPatch.Track(transferable, t);
-        }
-    }
-
     class FTFoodTotal
     {
         public int Total;
         public float TotalFractions;
+
+        public FTFoodTotal Clone()
+        {
+            return (FTFoodTotal)this.MemberwiseClone();
+        }
     }
+
+    [HarmonyPatch]
+    public static class TransferableUtility_MatchingPatch
+    {
+        // Dynamically specify the exact generic instantiation: TransferableMatching<TransferableOneWay>
+        public static MethodBase TargetMethod()
+        {
+            MethodInfo genericMethod = typeof(TransferableUtility)
+                .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .FirstOrDefault(m => m.Name == nameof(TransferableUtility.TransferableMatching) && m.IsGenericMethod);
+
+            return genericMethod?.MakeGenericMethod(typeof(TransferableOneWay));
+        }
+
+        [HarmonyPostfix]
+        public static void Postfix(Thing thing, TransferableOneWay __result)
+        {
+            if (thing == null || __result == null)
+                return;
+
+            // Auto-track the Thing under its matched TransferableOneWay
+            CaravanPatch.Track(__result, thing);
+        }
+    }
+
+    [HarmonyPatch]
+    public static class MultiDialog_Recache_Patch
+    {
+        // Dynamically return all recalculation methods across RimWorld caravan/transfer dialogs
+        public static IEnumerable<MethodBase> TargetMethods()
+        {
+            yield return AccessTools.Method(typeof(Dialog_FormCaravan), "CalculateAndRecacheTransferables");
+
+            Type splitDialog = AccessTools.TypeByName("RimWorld.Planet.Dialog_SplitCaravan");
+            if (splitDialog != null)
+                yield return AccessTools.Method(splitDialog, "CalculateAndRecacheTransferables");
+
+            Type portalDialog = AccessTools.TypeByName("RimWorld.Dialog_EnterPortal");
+            if (portalDialog != null)
+                yield return AccessTools.Method(portalDialog, "CalculateAndRecacheTransferables");
+
+            Type transporterDialog = AccessTools.TypeByName("RimWorld.Dialog_LoadTransporters");
+            if (transporterDialog != null)
+                yield return AccessTools.Method(transporterDialog, "CalculateAndRecacheTransferables");
+        }
+
+        [HarmonyPrefix]
+        public static void Prefix()
+        {
+            // Safe to clear before any of these dialogs rebuild their transferables
+            CaravanPatch.trackedTransferables.Clear();
+        }
+    }
+
 
     public static class CaravanPatch
     {
+        // Primary lookup: Maps each TransferableOneWay to its underlying Thing instances
         public static Dictionary<TransferableOneWay, List<Thing>> trackedTransferables = new Dictionary<TransferableOneWay, List<Thing>>();
 
+        // Resets tracking data when a caravan dialog opens or rebuilds.
+        public static void Clear()
+        {
+            trackedTransferables.Clear();
+
+            Log.Message("[FoodTracker] Tracking dictionary cleared for fresh caravan session.");
+        }
+
+        // Registers or updates a Thing under its corresponding TransferableOneWay.
         public static void Track(TransferableOneWay transferable, Thing thing)
         {
-            // Get or create the List<Thing> bucket for this Transferable.
-            if (!trackedTransferables.TryGetValue(transferable, out var things))
-            {
-                // If no Lists exist yet this is the first of this food type.
-                things = new List<Thing>();
-                trackedTransferables.Add(transferable, things);
 
-                Log.Message($"[FoodTracker] Track | NEW TransferableOneWay created in tracking dictionary | Thing: {thing} (ID {thing.thingIDNumber})");
-            }
+            if (transferable == null || thing == null)
+                return;
 
             CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
 
@@ -666,58 +784,46 @@ namespace FoodTracker
             // Normalize nutrition values if stack count and tracked nutrition data don't match.
             CompFoodTrackerUtility.NormalizeState(thing);
 
-            // Appends the Thing to it's corresponding List.
-            things.Add(thing);
-
-            Log.Message($"[FoodTracker] Track | Thing: {thing} (ID {thing.thingIDNumber}) | " +
-                $"Thing Stack Count: {thing.stackCount} | Thing List Count: {things.Count}");
-        }
-
-        public static List<float> FindBestFractionsToPick(List<float> availableFractions, int fractionsToRemove, float targetFractionTotal)
-        {
-            int availableFractionCount = availableFractions.Count;
-
-            if (fractionsToRemove <= 0 || fractionsToRemove > availableFractionCount)
-                return new List<float>();
-
-            float smallestDifference = float.MaxValue;
-            List<float> bestFractions = null;
-
-            void SearchForBestCombination(int currentIndex, int fractionsStillToPick, float currentFractionTotal, List<float> selectedFractions)
+            // Get or initialize the Thing bucket for this transferable
+            if (!trackedTransferables.TryGetValue(transferable, out List<Thing> things))
             {
-                if (fractionsStillToPick == 0)
-                {
-                    float differenceFromTarget = Math.Abs(currentFractionTotal - targetFractionTotal);
-
-                    if (differenceFromTarget < smallestDifference)
-                    {
-                        smallestDifference = differenceFromTarget;
-                        bestFractions = new List<float>(selectedFractions);
-                    }
-
-                    return;
-                }
-
-                if (currentIndex >= availableFractionCount || (availableFractionCount - currentIndex) < fractionsStillToPick)
-                {
-                    return;
-                }
-
-                // Try picking this fraction.
-                selectedFractions.Add(availableFractions[currentIndex]);
-
-                SearchForBestCombination(currentIndex + 1, fractionsStillToPick - 1, currentFractionTotal + availableFractions[currentIndex], selectedFractions);
-
-                // Undo that choice so we can try skipping this fraction.
-                selectedFractions.RemoveAt(selectedFractions.Count - 1);
-
-                // Try skipping this fraction.
-                SearchForBestCombination(currentIndex + 1, fractionsStillToPick, currentFractionTotal, selectedFractions);
+                things = new List<Thing>();
+                trackedTransferables.Add(transferable, things);
+                Log.Message($"[FoodTracker] Track | Created NEW Transferable tracking bucket for: {transferable.ThingDef?.defName}");
             }
 
-            SearchForBestCombination(0, fractionsToRemove, 0f, new List<float>());
+            // Prevent duplicate tracking if AddToTransferables fires twice for the same Thing reference
+            if (things.Contains(thing))
+            {
+                Log.Message($"[FoodTracker] Track | Thing Already Registered: {thing.def} (ID: {thing.thingIDNumber}");
 
-            return bestFractions ?? new List<float>();
+                return;
+            }
+
+            int totalCount = 0;
+
+            foreach (Thing t in things)
+            {
+                CompFoodTracker tr = t.TryGetComp<CompFoodTracker>();
+
+                if (tr.RemainingFractions.Count > 0)
+                {
+                    foreach (int i in tr.RemainingFractions)
+                        totalCount++;
+                }
+                else
+                    totalCount++;
+            }
+
+            if (tracker.RemainingFractions.Count > 0)
+            {
+                foreach (int i in tracker.RemainingFractions)
+                    totalCount++;
+            }
+
+            things.Add(thing);
+            Log.Message($"[FoodTracker] Track | Registered Thing: {thing.LabelCap} (ID: {thing.thingIDNumber}) | StackCount: {thing.stackCount} | " +
+                $"Total Fractions: {totalCount} | Total List Values: {things.Count} | Total Keys: {CaravanPatch.trackedTransferables.Count}");
         }
 
         public static float GetActualMassContribution(Thing thing, int count)
