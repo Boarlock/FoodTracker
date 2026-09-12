@@ -22,7 +22,6 @@ namespace FoodTracker
 
             var codes = new List<CodeInstruction>(instructions);
 
-            // Iterate through the IL instructions in DrawPrice().
             for (int i = 1; i < codes.Count - 5; i++)
             {
 

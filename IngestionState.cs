@@ -18,7 +18,6 @@ namespace FoodTracker
         // Captured during Prefix while the Food Thing is still reliable.
         public Pawn Pawn;
         public bool IsDrug;
-        public Thing PreIngestObject;
         public Thing PostIngestObject;
         public ThingDef ObjectDef;
         public ThingDef ObjectGameDef;
@@ -31,8 +30,6 @@ namespace FoodTracker
         // Captured after vanilla initializes the toil.
         public int StartTick;
         public int TotalTicks;
-        public float HungerAtStart;
-        public IntVec3 FoodCell;
 
         // Runtime state.
         public float IngestedFraction;

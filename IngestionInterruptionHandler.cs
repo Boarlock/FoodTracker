@@ -174,7 +174,7 @@ namespace FoodTracker
             }
 
             // Create a new Thing to represent the new meal, and drop it in the world.
-            Thing newFood = PartialMealFactory.CreateAndDropPartialMeal(state, fractionIntoPartial, state.Pawn.Position);
+            Thing newFood = PartialMealFactory.CreateAndDropPartialMeal(state, fractionIntoPartial);
 
             // If failed to create a partial meal then remove one from items to remove and correct nutrition to give to pawn.
             if (newFood == null)

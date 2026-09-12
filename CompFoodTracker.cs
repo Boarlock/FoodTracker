@@ -49,9 +49,6 @@ namespace FoodTracker
             if (respawningAfterLoad )
                 return;
 
-            if (FoodTrackerStackOperations.MergeInProgress || FoodTrackerStackOperations.SplitInProgress)
-                return;
-
             if (parent.stackCount <= 0)
                 return;
 
@@ -172,26 +169,46 @@ namespace FoodTracker
             // SINGLETON STATE
             if (thing.stackCount == 1)
             {
-                tracker.RemainingFractions.Clear();
-                if (tracker.PartialFraction <= 0f)
+                if (tracker.RemainingFractions.Count > 0)
                 {
-                    tracker.PartialFraction = 1f;
+                    tracker.PartialFraction = tracker.RemainingFractions[0];
+                    tracker.RemainingFractions.Clear();
                 }
+
+                if (tracker.PartialFraction <= 0f || tracker.PartialFraction > 1f)
+                    tracker.PartialFraction = 0.01f;
+
                 return;
             }
 
             // STACK STATE
             tracker.PartialFraction = -1f;
 
-            // Existing per-item nutrition array length matches physical stack
-            if (tracker.RemainingFractions.Count == thing.stackCount)
-                return;
-
-            // Otherwise repair/initialize the stack
-            tracker.RemainingFractions.Clear();
-            for (int i = 0; i < thing.stackCount; i++)
+            if (tracker.RemainingFractions.Count == 0)
             {
-                tracker.RemainingFractions.Add(1f);
+                for (int i = 0; i < thing.stackCount; i++)
+                    tracker.RemainingFractions.Add(0.01f);
+
+                return;
+            }
+
+            // Too many fractions: discard excess physical representations.
+            while (tracker.RemainingFractions.Count > thing.stackCount)
+                tracker.RemainingFractions.RemoveAt(0);
+
+            // Too few fractions: physical stack conforms to FT.
+            if (tracker.RemainingFractions.Count < thing.stackCount)
+                thing.stackCount = tracker.RemainingFractions.Count;
+
+            // If that correction reduced the physical stack to one,
+            // convert the single list entry back to singleton form.
+            if (thing.stackCount == 1)
+            {
+                tracker.PartialFraction = tracker.RemainingFractions[0];
+                tracker.RemainingFractions.Clear();
+
+                if (tracker.PartialFraction <= 0f || tracker.PartialFraction > 1f)
+                    tracker.PartialFraction = 0.01f;
             }
         }
     }

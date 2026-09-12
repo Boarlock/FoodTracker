@@ -6,6 +6,7 @@ using System.Reflection;
 using UnityEngine;
 using Verse;
 using Verse.AI;
+using static UnityEngine.GraphicsBuffer;
 
 namespace FoodTracker
 {
@@ -32,7 +33,7 @@ namespace FoodTracker
 
             bool isSupportedDrug = FoodTrackingHelpers.GetDrugType(obj.def) != FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported;
 
-            if (!obj.def.IsNutritionGivingIngestible && !isSupportedDrug)
+            if (!chewer.WillEat(obj) && !obj.def.IsNutritionGivingIngestible && !isSupportedDrug)
                 return;
 
             // Get the FoodTracker and Ingredients components if they exist.
@@ -90,8 +91,6 @@ namespace FoodTracker
                 IsDrug = isSupportedDrug, // Bool to track if current ingestion is a food or drug item.
 
                 Pawn = chewer, // The pawn who is eating the food.
-
-                PreIngestObject = obj, // The food object(s), or stack of food, that the pawn is attempting to eat in this job.
 
                 ObjectTrackerDef = trackerDef, // The FoodTracker def.
 
@@ -153,14 +152,9 @@ namespace FoodTracker
                 Thing obj = chewer.CurJob?.GetTarget(ingestibleInd).Thing;
 
                 // Finish populating the state.
-
                 state.PostIngestObject = obj; // The food object(s) in the pawns hands/on the ground during interruption. This may be .Destroyed if the pawn is interrupted while drafted.
 
                 state.ThingID = obj.thingIDNumber;
-
-                state.HungerAtStart = chewer.needs.food.CurLevel; // The hunger level of the pawn at the start of the job used to calculate how much nutrition to substract from vanilla.
-
-                state.FoodCell = chewer.Position; // The cell the pawn is standing on when they start eating, used to determine survivingStack if the food is .Destroyed.
 
                 FoodTrackerIngestionTracker.Register(state);
 
@@ -197,14 +191,11 @@ namespace FoodTracker
                 // How much should have been applied.
                 float consumedFraction = state.TotalFraction * state.IngestedFraction;
 
-                // How much nutrition vanilla applied and correction to be applied.
-                float vanillaNutritionAdded = state.Pawn.needs.food.CurLevel - state.HungerAtStart;
-
                 FoodTrackerIngestionTracker.Remove(state.Pawn);
 
                 if (FoodTrackerSettings.Verbose)
                     Log.Message($"[FoodTracker][T{state.TraceID}] Eating Completed: {state.ObjectDef.defName} (ID {state.PostIngestObject.thingIDNumber}) " +
-                        $"| How much should have been applied: {consumedFraction:F2} | Vanilla Added: {vanillaNutritionAdded:F2}");
+                        $"| How much should have been applied: {consumedFraction:F2}");
 
                 return;
             }
@@ -234,52 +225,51 @@ namespace FoodTracker
     [HarmonyPatch(typeof(Thing), "IngestedCalculateAmounts")]
     public static class Thing_IngestedCalculateAmounts_Patch
     {
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        [HarmonyPostfix]
+        public static void Postfix(Thing __instance, Pawn ingester, float nutritionWanted, ref int numTaken, ref float nutritionIngested)
         {
-            var codes = new List<CodeInstruction>(instructions);
 
-            MethodInfo nutritionForEater = AccessTools.Method(typeof(FoodUtility), nameof(FoodUtility.NutritionForEater));
+            if (ingester == null || __instance == null)
+                return;
 
-            for (int i = 0; i < codes.Count; i++)
-            {
-                if (codes[i].Calls(nutritionForEater))
-                {
-                    codes[i] = CodeInstruction.Call(typeof(Thing_IngestedCalculateAmounts_Patch), nameof(AdjustNutritionValue));
-
-                    break;
-                }
-            }
-            return codes;
-        }
-
-        public static float AdjustNutritionValue(Pawn eater, Thing food)
-        {
-            if (food == null)
-                return 0f;
-
-            float nutrition = FoodUtility.NutritionForEater(eater, food);
-
-            CompFoodTracker tracker = food.TryGetComp<CompFoodTracker>();
+            float nutrition = FoodUtility.NutritionForEater(ingester, __instance);
+            CompFoodTracker tracker = __instance.TryGetComp<CompFoodTracker>();
 
             if (tracker == null)
-                return nutrition;
+                return;
+
+            CompFoodTrackerUtility.NormalizeState(__instance);
 
             float totalFractions = 0f;
+            float totalNutrition = 0f;
+            int itemsToRemove = 0;
 
-            if (tracker.RemainingFractions.Count > 0)
+            if (tracker.RemainingFractions.Count > 0 && itemsToRemove < numTaken)
             {
-                for (int i = 0; i < tracker.RemainingFractions.Count; i++)
+                for (int i = 0; i < tracker.RemainingFractions.Count && itemsToRemove < numTaken; i++)
                 {
                     totalFractions += tracker.RemainingFractions[i];
+                    totalNutrition = totalFractions * nutrition;
+
+                    itemsToRemove++;
                 }
             }
             else
             {
                 totalFractions = tracker.PartialFraction;
+                totalNutrition = totalFractions * nutrition;
+
+                itemsToRemove++;
             }
 
-            return nutrition * totalFractions;
+            if (numTaken > itemsToRemove)
+            {
+                numTaken = itemsToRemove;
+            }
+
+            nutritionIngested = totalNutrition;
+
+            return;
         }
     }
 
@@ -297,9 +287,6 @@ namespace FoodTracker
             // Only intercept this exact Thing if it is actively being ingested.
             if (FoodTrackerIngestionTracker.IsBeingIngested(thing, out IngestionState state))
             {
-
-                Log.Message(
-                    $"[FoodTracker][T{state.TraceID}] Intercepted TryDrop. Thing: {thing.def.defName} (ID {thing.thingIDNumber})");
                 return false;
             }
 

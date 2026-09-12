@@ -134,8 +134,6 @@ namespace FoodTracker
                             totals.TotalFractions += tracker.PartialFraction;
                             totals.Total++;
                         }
-
-                        Log.Message($"[Run #{currentRunId}] INVENTORIES - ThingDef: {thing.def} - Total Count: {totals.Total} Fraction Total: {totals.TotalFractions}");
                     }
                     else
                     {
@@ -158,7 +156,6 @@ namespace FoodTracker
                             newTotal.TotalFractions += tracker.PartialFraction;
                             newTotal.Total++;
                         }
-                        Log.Message($"[Run #{currentRunId}] INVENTORIES - New ThingDef Added: {thing.def} - Total Count: {newTotal.Total} Fraction Total: {newTotal.TotalFractions}");
 
                         ftFoodTotalsBaseline.Add(thing.def, newTotal);
                     }
@@ -315,7 +312,6 @@ namespace FoodTracker
                                     totals.Total++;
                                 }
                             }
-                            Log.Message($"[Run #{currentRunId}] TRANSFERABLES - ThingDef: {thing.def} - Total Count: {totals.Total} Fraction Total: {totals.TotalFractions}");
 
                             continue;
                         }
@@ -345,7 +341,6 @@ namespace FoodTracker
                                     newTotal.Total++;
                                 }
                             }
-                            Log.Message($"[Run #{currentRunId}] TRANSFERABLES - New ThingDef Added: {thing.def} - Total Count: {newTotal.Total} Fraction Total: {newTotal.TotalFractions}");
 
                             ftFoodTotalsBaseline.Add(thing.def, newTotal);
                         }
@@ -357,17 +352,12 @@ namespace FoodTracker
             // FOODTRACKER LOGIC BEGINS HERE
             Dictionary<ThingDef, FTFoodTotal> ftFoodTotalWorkingSet = ftFoodTotalsBaseline.ToDictionary(entry => entry.Key, entry => entry.Value.Clone());
 
-            int dayCount = 0;
-
-            foreach (var (key, value) in ftFoodTotalWorkingSet)
-                Log.Message($"[Run #{currentRunId}] Day {dayCount} WORKING DICTIONARY CREATION - ThingDef: {key} - Total Count: {value.Total} - Fraction Total: {value.TotalFractions}");
-
             // Simulate food consumption one food-day at a time until every pawn is fed,
             // food runs out, or the result exceeds the vanilla upper bound.
             bool foodWasConsumed;
+
             do
             {
-                dayCount++;
 
                 foodWasConsumed = false;
                 int ticksAtCurrentFoodDay = ticksAbs + (int)(currentDaysWorthOfFood * 60000f);
@@ -391,7 +381,6 @@ namespace FoodTracker
                         // Amount and type of food vanilla is adding.
                         int foragedFoodCount = Mathf.RoundToInt(ForagedFoodPerDayCalculator.GetForagedFoodCountPerInterval(pawns, primaryBiome, faction));
                         ThingDef foragedFood = primaryBiome.foragedFood;
-                        int foragedFoodIteration = 0;
 
                         // Bool for FT foods.
                         bool isFTFood = false;
@@ -403,7 +392,6 @@ namespace FoodTracker
 
                         while (accumulatedForageTicks >= ticksPerForageInterval)
                         {
-                            foragedFoodIteration++;
 
                             accumulatedForageTicks -= ticksPerForageInterval;
 
@@ -424,9 +412,6 @@ namespace FoodTracker
                                         randomFraction = UnityEngine.Random.value;
                                         totals.TotalFractions += randomFraction;
                                         totals.Total++;
-
-                                        Log.Message($"[Run #{currentRunId}] Day {dayCount} Foraged Food {foragedFoodIteration} - ThingDef: {foragedFood} - Items Added: {foragedFoodCount} - " +
-                                            $"Total Count: {totals.Total} - Fraction Total: {totals.TotalFractions} - Random Fraction Generated: {randomFraction}");
                                     }
                                 }
                                 else
@@ -443,9 +428,6 @@ namespace FoodTracker
                                         randomFraction = UnityEngine.Random.value;
                                         newTotal.TotalFractions += randomFraction;
                                         newTotal.Total++;
-
-                                        Log.Message($"[Run #{currentRunId}] Day {dayCount} Foraged Food {foragedFoodIteration} NEW THINGDEF ADDED - ThingDef: {foragedFood} - " +
-                                            $"Items Added: {foragedFoodCount} - Total Count: {newTotal.Total} - Fraction Total: {newTotal.TotalFractions} - Random Fraction Generated: {randomFraction}");
                                     }
 
                                     ftFoodTotalWorkingSet.Add(foragedFood, newTotal);
@@ -536,8 +518,6 @@ namespace FoodTracker
                                     continue;
                                 }
 
-                                Log.Message($"[Run #{currentRunId}] Day {dayCount} PRE-COUNT CLAMP - Vanilla's Sim Count: {food.Count} - Total Count: {ftTotal.Total}");
-
                                 // FT Total is the absolute maximum number of units that can exist
                                 // in this simulation. Vanilla's working count cannot exceed it.
                                 if (food.Count > ftTotal.Total)
@@ -589,15 +569,7 @@ namespace FoodTracker
                                     ftTotal.Total = 0;
                                     ftTotal.TotalFractions = 0f;
                                 }
-
-                                Log.Message($"[Run #{currentRunId}] Day {dayCount} FINISHED - Remaining Total: {ftTotal.Total} - Remaining Fractions: {ftTotal.TotalFractions} - " +
-                                $"Items Removed: {itemCount} - ThingDef: {food.ThingDef} - Average Fraction: {averageFraction} - Fractions Removed: {fractionsToRemove} - " +
-                                $"Nutrition Per Item: {nutritionPerItem} - Nutrition Needed: {nutritionNeeded} - Vanilla's Sim Count: {food.Count}");
-
                             }
-
-                            Log.Message($"[Run #{currentRunId}] Day {dayCount} FINISHED - Items Removed: {itemCount} - ThingDef: {food.ThingDef} - " +
-                                $"Nutrition Per Item: {nutritionPerItem} - Nutrition Needed: {nutritionNeeded} - Vanilla's Sim Count: {food.Count}");
 
                             foodWasConsumed = true;
                         }
@@ -626,7 +598,6 @@ namespace FoodTracker
                 }
             }
 
-            Log.Message($"[Run #{currentRunId}] END - Total Days: {dayCount}\n");
             __result = minimumDaysWorthOfFood;
 
             // The result above replaces the vanilla result, so skip the original method.
@@ -781,10 +752,7 @@ namespace FoodTracker
             if (tracker == null)
                 return;
 
-            // Normalize nutrition values if stack count and tracked nutrition data don't match.
-            CompFoodTrackerUtility.NormalizeState(thing);
-
-            // Get or initialize the Thing bucket for this transferable
+            // Get or initialize the Thing list for this transferable
             if (!trackedTransferables.TryGetValue(transferable, out List<Thing> things))
             {
                 things = new List<Thing>();
@@ -799,31 +767,6 @@ namespace FoodTracker
 
                 return;
             }
-
-            int totalCount = 0;
-
-            foreach (Thing t in things)
-            {
-                CompFoodTracker tr = t.TryGetComp<CompFoodTracker>();
-
-                if (tr.RemainingFractions.Count > 0)
-                {
-                    foreach (int i in tr.RemainingFractions)
-                        totalCount++;
-                }
-                else
-                    totalCount++;
-            }
-
-            if (tracker.RemainingFractions.Count > 0)
-            {
-                foreach (int i in tracker.RemainingFractions)
-                    totalCount++;
-            }
-
-            things.Add(thing);
-            Log.Message($"[FoodTracker] Track | Registered Thing: {thing.LabelCap} (ID: {thing.thingIDNumber}) | StackCount: {thing.stackCount} | " +
-                $"Total Fractions: {totalCount} | Total List Values: {things.Count} | Total Keys: {CaravanPatch.trackedTransferables.Count}");
         }
 
         public static float GetActualMassContribution(Thing thing, int count)
