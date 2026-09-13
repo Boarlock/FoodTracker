@@ -7,9 +7,8 @@ using Verse;
 
 namespace FoodTracker
 {
-    public static class TradePatch
+    public static class MarketValuePatch
     {
-        
         public static float CalculateFoodTrackerTradePrice(Tradeable tradeable, float vanillaResult)
         {
             // Determine which direction the trade is going.
@@ -147,6 +146,67 @@ namespace FoodTracker
             }
             return ftValue;
         }
+    }
+
+    [HarmonyPatch(typeof(Tradeable), "CurTotalCurrencyCostForDestination", MethodType.Getter)]
+    public static class MarketValuePatch_CurTotalCurrencyCostForDestination
+    {
+        public static void Postfix(Tradeable __instance, ref float __result)
+        {
+            float vanillaResult = __result;
+
+            float ftPrice = MarketValuePatch.CalculateFoodTrackerTradePrice(__instance, vanillaResult);
+
+            if (ftPrice != 0f)
+                __result = ftPrice;
+        }
+    }
+
+    [HarmonyPatch(typeof(Tradeable), "CurTotalCurrencyCostForSource", MethodType.Getter)]
+    public static class MarketValuePatch_CurTotalCurrencyCostForSource
+    {
+        public static void Postfix(Tradeable __instance, ref float __result)
+        {
+            float vanillaResult = __result;
+
+            float ftPrice = MarketValuePatch.CalculateFoodTrackerTradePrice(__instance, vanillaResult);
+
+            if (ftPrice != 0f)
+                __result = ftPrice;
+        }
+    }
+
+    [HarmonyPatch(typeof(TradeUI), "DrawPrice", new[] { typeof(Rect), typeof(Tradeable), typeof(TradeAction)})]
+    public static class MarketValuePatch_TradeUI_DrawPrice
+    {
+        [HarmonyTranspiler]
+        public static IEnumerable<CodeInstruction> TradePriceLabel_Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
+
+            // Target method System.Single.ToString().
+            // Target method Verse.GenText.ToStringMoney(float, string).
+            MethodInfo toString = AccessTools.Method(typeof(float), nameof(float.ToString), new System.Type[] { });
+            MethodInfo toStringMoney = AccessTools.Method(typeof(GenText), nameof(GenText.ToStringMoney), new[] { typeof(float), typeof(string) });
+
+            var codes = new List<CodeInstruction>(instructions);
+
+            for (int i = 3; i < codes.Count - 4; i++)
+            {
+
+                // OLD C#: string label = ((TradeSession.TradeCurrency == TradeCurrency.Silver) ? priceFor.ToStringMoney() : priceFor.ToString());
+                // NEW C#: string label = GetTradePriceLabel(priceFor, trad);
+                if (codes[i].Calls(toString) && codes[i + 4].Calls(toStringMoney))
+                {
+                    codes[i - 3] = CodeInstruction.LoadLocal(1);
+                    codes[i - 2] = CodeInstruction.LoadArgument(1);
+                    codes[i - 1] = CodeInstruction.Call(typeof(MarketValuePatch_TradeUI_DrawPrice), nameof(GetTradePriceLabel));
+                    codes.RemoveRange(i, 5);
+
+                    break;
+                }
+            }
+            return codes;
+        }
 
         public static string GetTradePriceLabel(float priceFor, Tradeable trad)
         {
@@ -166,64 +226,31 @@ namespace FoodTracker
         }
     }
 
-    [HarmonyPatch(typeof(TradeUI), "DrawPrice", new[] { typeof(Rect), typeof(Tradeable), typeof(TradeAction)})]
-    public static class TradePatch_DrawPrice
+    [HarmonyPatch(typeof(TransferableOneWayWidget), "DrawMarketValue")]
+    public static class MarketValuePatch_DrawMarketValue
     {
-        [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
 
-            // Target method System.Single.ToString().
-            // Target method Verse.GenText.ToStringMoney(float, string).
-            MethodInfo toString = AccessTools.Method(typeof(float), nameof(float.ToString), new System.Type[] { });
+        [HarmonyTranspiler]
+        public static IEnumerable<CodeInstruction> MarketValueLabel_Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
             MethodInfo toStringMoney = AccessTools.Method(typeof(GenText), nameof(GenText.ToStringMoney), new[] { typeof(float), typeof(string) });
 
             var codes = new List<CodeInstruction>(instructions);
 
-            for (int i = 3; i < codes.Count - 4; i++)
+            for (int i = 0; i < codes.Count; i++)
             {
-
-                // OLD C#: string label = ((TradeSession.TradeCurrency == TradeCurrency.Silver) ? priceFor.ToStringMoney() : priceFor.ToString());
-                // NEW C#: string label = GetTradePriceLabel(priceFor, trad);
-                if (codes[i].Calls(toString) && codes[i + 4].Calls(toStringMoney))
+                if (codes[i].Calls(toStringMoney))
                 {
-                    codes[i - 3] = CodeInstruction.LoadLocal(1);
-                    codes[i - 2] = CodeInstruction.LoadArgument(1);
-                    codes[i - 1] = CodeInstruction.Call(typeof(TradePatch), nameof(TradePatch.GetTradePriceLabel));
-                    codes.RemoveRange(i, 5);
+                    codes.InsertRange(i + 1, new[]
+                    {
+                        CodeInstruction.LoadArgument(2), 
+                        CodeInstruction.Call(typeof(CaravanPatch), nameof(CaravanPatch.GetCaravanLabel))
+                    });
 
                     break;
                 }
             }
             return codes;
-        }
-    }
-
-    [HarmonyPatch(typeof(Tradeable), "CurTotalCurrencyCostForDestination", MethodType.Getter)]
-    public static class TradePatch_Destination
-    {
-        public static void Postfix(Tradeable __instance, ref float __result)
-        {
-            float vanillaResult = __result;
-
-            float ftPrice = TradePatch.CalculateFoodTrackerTradePrice(__instance, vanillaResult);
-
-            if (ftPrice != 0f)
-                __result = ftPrice;
-        }
-    }
-
-    [HarmonyPatch(typeof(Tradeable), "CurTotalCurrencyCostForSource", MethodType.Getter)]
-    public static class TradePatch_Source
-    {
-        public static void Postfix(Tradeable __instance, ref float __result)
-        {
-            float vanillaResult = __result;
-
-            float ftPrice = TradePatch.CalculateFoodTrackerTradePrice(__instance, vanillaResult);
-
-            if (ftPrice != 0f)
-                __result = ftPrice;
         }
     }
 }

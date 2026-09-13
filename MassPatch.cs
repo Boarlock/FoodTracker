@@ -9,7 +9,7 @@ namespace FoodTracker
 {
 
     [HarmonyPatch]
-    public static class MassUsagePatch
+    public static class MassPatch
     {
         public static IEnumerable<MethodBase> TargetMethods()
         {
@@ -23,7 +23,7 @@ namespace FoodTracker
         }
 
         [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        public static IEnumerable<CodeInstruction> MassCalculator_Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             MethodInfo getStatValue = AccessTools.Method(typeof(StatExtension), nameof(StatExtension.GetStatValue));
             FieldInfo mass = AccessTools.Field(typeof(StatDefOf), nameof(StatDefOf.Mass));
@@ -36,7 +36,7 @@ namespace FoodTracker
                 {
                     codes.RemoveRange(i, 7);
                     codes.Insert(i, CodeInstruction.LoadLocal(2));
-                    codes.Insert(i + 1, CodeInstruction.Call(typeof(MassUsagePatch), nameof(GetFoodTrackerMass)));
+                    codes.Insert(i + 1, CodeInstruction.Call(typeof(MassPatch), nameof(GetFoodTrackerMass)));
 
                     break;
                 }
@@ -44,7 +44,7 @@ namespace FoodTracker
                 {
                     codes.RemoveRange(i, 7);
                     codes.Insert(i, CodeInstruction.LoadLocal(3));
-                    codes.Insert(i + 1, CodeInstruction.Call(typeof(MassUsagePatch), nameof(GetFoodTrackerMass)));
+                    codes.Insert(i + 1, CodeInstruction.Call(typeof(MassPatch), nameof(GetFoodTrackerMass)));
 
                     break;
                 }
@@ -96,6 +96,34 @@ namespace FoodTracker
                 $"totalFraction={totalFraction}, result={totalMass}");
 
             return totalMass;
+        }
+    }
+
+    [HarmonyPatch(typeof(TransferableOneWayWidget), "DrawMass")]
+    public static class MassPatch_DrawMass
+    {
+
+        [HarmonyTranspiler]
+        public static IEnumerable<CodeInstruction> MassLabel_Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
+            MethodInfo toStringMass = AccessTools.Method(typeof(GenText), nameof(GenText.ToStringMass), new[] { typeof(float) });
+
+            var codes = new List<CodeInstruction>(instructions);
+
+            for (int i = 0; i < codes.Count; i++)
+            {
+                if (codes[i].Calls(toStringMass))
+                {
+                    codes.InsertRange(i + 1, new[]
+                    {
+                        CodeInstruction.LoadArgument(2),
+                        CodeInstruction.Call(typeof(CaravanPatch), nameof(CaravanPatch.GetCaravanLabel))
+                    });
+
+                    break;
+                }
+            }
+            return codes;
         }
     }
 }

@@ -14,7 +14,7 @@ namespace FoodTracker
     public static class SplitOffPatch
     {
         [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        public static IEnumerable<CodeInstruction> SplitOff_Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             MethodInfo thingMaker = AccessTools.Method(typeof(ThingMaker), nameof(ThingMaker.MakeThing), new[] { typeof(ThingDef), typeof(ThingDef) });
 
@@ -157,7 +157,7 @@ namespace FoodTracker
     public static class TryAbsorbStackPatch
     {
         [HarmonyTranspiler]
-        public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        public static IEnumerable<CodeInstruction> TryAbsorbStack_Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             MethodInfo ceilToInt = AccessTools.Method(typeof(UnityEngine.Mathf), nameof(UnityEngine.Mathf.CeilToInt), new[] { typeof(float) });
 
