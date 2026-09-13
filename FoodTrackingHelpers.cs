@@ -7,68 +7,55 @@ namespace FoodTracker
     public static class FoodTrackingHelpers
 
     {
+        // If fraction is below this value FT doesn't even track it.
+        public const float MinimumPartialFraction = 0.045f;
 
-        // If nutrition is below this threshold treat as interrupted, otherwise FoodTracker does not interfere with ingestion completion.
-        public const float MealCompletionThreshold = 0.99f;
+        public static FoodTrackerDrugEffects.FoodTrackerDrugType GetDrugType(ThingDef def)
+        {
+            if (def == null || def.ingestible == null)
+                return FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported;
 
-        // This is a number we use internally to classify if something is treated as a meal or a batch food item (to make a partial variant or not to).
-        public const float MealQualifierThreshold = 0.225f;
+            switch (def.defName)
+            {
+                case "Ambrosia":
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.Ambrosia;
 
-        // This is a number we use to scale eating duration time.
-        public const float NutritionConsumptionRateMultiplier = 0.90f;
+                case "Beer":
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.Beer;
+
+                case "PsychiteTea":
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.PsychiteTea;
+
+                case "SmokeleafJoint":
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.Smokeleaf;
+
+                case "GoJuice":
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.GoJuice;
+
+                case "Flake":
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.Flake;
+
+                default:
+                    return FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported;
+            }
+        }
 
         // Does the reverse operation of calling DynamicMealDefFactory.CreateTrackerMeal(def), this returns the base meal type def.
-        public static ThingDef GetOriginalMealDef(ThingDef mealDef)
+        public static ThingDef GetOriginalDef(ThingDef objDef)
         {
-            if (mealDef == null)
+            if (objDef == null)
             {
-                Log.Warning($"[FoodTracker] Input is not valid. ThingDef Null: {mealDef == null}");
+                Log.Warning($"[FoodTracker] Input is not valid. ThingDef Null: {objDef == null}");
 
                 return null;
             }
 
-            if (!mealDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
-                return mealDef;
+            if (!objDef.defName.StartsWith(DynamicMealDefFactory.Prefix))
+                return objDef;
 
-            string originalDefName = mealDef.defName[DynamicMealDefFactory.Prefix.Length..];
+            string originalDefName = objDef.defName[DynamicMealDefFactory.Prefix.Length..];
 
             return DefDatabase<ThingDef>.GetNamedSilentFail(originalDefName);
-        }
-
-        // Determines if the target food is a batch food item that should not be subdivided into partials.
-        public static bool IsBatchFood(ThingDef foodDef)
-        {
-            if (foodDef == null)
-            {
-                Log.Warning($"[FoodTracker] Input is not valid. ThingDef Null: {foodDef == null}");
-
-                return false;
-            }
-
-            float nutrition = foodDef?.GetStatValueAbstract(StatDefOf.Nutrition) ?? 0f;
-
-            return nutrition < MealQualifierThreshold;
-        }
-
-        public static bool ValidateFoodEatingAttempt(Pawn pawn, Thing food)
-        {
-
-            if (pawn == null || food == null || food.Destroyed)
-            {
-                if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker] Inputs are not valid. Pawn Null: {pawn == null} | Food Null: {food == null} " +
-                        $"| Food Destroyed: {food?.Destroyed ?? false}");
-
-                return false;
-            }
-
-            if (!pawn.RaceProps.Humanlike)
-                return false;
-
-            if (!food.def.IsNutritionGivingIngestible)
-                return false;
-
-            return true;
         }
 
         // Method to check pawn and nutrition for invalid values, and apply nutrition to pawn.
@@ -89,14 +76,16 @@ namespace FoodTracker
                 return;
             }
             
+            // Calculate current hunger level and max total hunger to see how much the pawn could eat.
             float currentHungerLevel = state.Pawn.needs.food.CurLevel;
             float maxHungerLevel = state.Pawn.needs.food.MaxLevel; // 1.0 for humans
             float roomInStomach = maxHungerLevel - currentHungerLevel;
 
+            // Then this caps the max amount eaten to what the pawn can eat.
             float actualNutritionEaten = Mathf.Min(nutrition, roomInStomach);
 
+            // Add the true amount eaten to the pawns current hunger and lifetime records.
             state.Pawn.needs.food.CurLevel += actualNutritionEaten;
-
             state.Pawn.records.AddTo(RecordDefOf.NutritionEaten, actualNutritionEaten);
 
         }

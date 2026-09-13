@@ -2,9 +2,11 @@
 using RimWorld;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 using Verse;
 using Verse.AI;
+using static UnityEngine.GraphicsBuffer;
 
 namespace FoodTracker
 {
@@ -18,101 +20,112 @@ namespace FoodTracker
 
         public static void Prefix(Pawn chewer, ref float durationMultiplier, TargetIndex ingestibleInd, ref IngestionState __state)
         {
-            // Get current job and target food.
-            Job curJob = chewer.CurJob;
-            Thing food = curJob?.GetTarget(ingestibleInd).Thing;
+            // Get the job, original food, original def, and tracker def.
+            Job curJob = chewer?.CurJob;
 
-            // Validate pawn is human and not null and food is nutrition giving and not null.
-            if (!FoodTrackingHelpers.ValidateFoodEatingAttempt(chewer, food))
+            if (curJob == null || chewer == null)
                 return;
 
-            int ingestCount = curJob?.count ?? 0;
+            Thing obj = curJob?.GetTarget(ingestibleInd).Thing;
 
-            CompFoodTracker tracker = food.TryGetComp<CompFoodTracker>();
-            CompIngredients ingredients = food.TryGetComp<CompIngredients>();
+            if (obj == null)
+                return;
 
-            float totalNutrition = 0f;
-            float nutritionPerItem = 0f;
+            bool isSupportedDrug = FoodTrackingHelpers.GetDrugType(obj.def) != FoodTrackerDrugEffects.FoodTrackerDrugType.Unsupported;
 
-            List<float> nutritionEntriesBefore = new List<float>();
+            if (!chewer.WillEat(obj) && !obj.def.IsNutritionGivingIngestible && !isSupportedDrug)
+                return;
+
+            // Get the FoodTracker and Ingredients components if they exist.
+            ThingDef trackerDef = DynamicMealDefFactory.CreateTrackerMeal(obj.def);
+            CompFoodTracker tracker = obj.TryGetComp<CompFoodTracker>();
+            CompIngredients ingredients = obj.TryGetComp<CompIngredients>();
+
+            // Initialize nutrition entries and ingredients lists before ingestion.
+            List<float> remainingFractionsBefore = new List<float>();
             List<ThingDef> ingredientsBefore = null;
 
+            // If the food has ingredients, copy them to the ingredientsBefore list.
             if (ingredients != null && ingredients.ingredients != null)
             {
                 ingredientsBefore = new List<ThingDef>(ingredients.ingredients);
             }
 
+            // Initialize nutrition per item, total nutrition and ingest count for the split path of FoodTracker and Non-FoodTracker foods.
+            int ingestCount = curJob.count;
+            float totalFraction = 0f;
+
             // FoodTracker meals use their actual individual tracked nutrition values.
             if (tracker != null)
             {
                 // SINGLETON STATE
-                if (tracker.NutritionEntries.Count == 0)
+                if (tracker.RemainingFractions.Count == 0)
                 {
-                    totalNutrition = tracker.PartialNutrition;
+                    // Total nutrition is the partial nutrition value for singleton meals.
+                    totalFraction = tracker.PartialFraction > 0f ? tracker.PartialFraction : 1f;
                 }
                 // STACK STATE
                 else
                 {
-                    nutritionEntriesBefore = new List<float>(tracker.NutritionEntries);
-
-                    int mealsToConsume = Mathf.Min(ingestCount, tracker.NutritionEntries.Count
-                    );
+                    // Copy the nutrition entries before ingestion to the state for later calculation.
+                    remainingFractionsBefore = new List<float>(tracker.RemainingFractions);
+                    int mealsToConsume = Mathf.Min(ingestCount, tracker.RemainingFractions.Count);
 
                     for (int i = 0; i < mealsToConsume; i++)
                     {
-                        totalNutrition += tracker.NutritionEntries[i];
+                        totalFraction += tracker.RemainingFractions[i];
                     }
                 }
             }
+            // Get Non-FoodTracker food total nutrition, and nutrition per item.
             else
             {
-                // Get the non-FT Def and store it in the state with total nutrition.
-                nutritionPerItem = food.GetStatValue(StatDefOf.Nutrition);
-                totalNutrition = ingestCount * nutritionPerItem;
-
+                totalFraction = ingestCount;
             }
-
-            ThingDef originalDef = FoodTrackingHelpers.GetOriginalMealDef(food.def);
 
             // Initialize ingestion state.
             __state = new IngestionState
             {
+                TraceID = ++nextTraceId, // Increment the trace ID for each ingestion.
 
-                TraceID = ++nextTraceId,
-                Pawn = chewer,
-                FoodDef = food.def,
-                BaseDef = originalDef,
-                StartingStackCount = food.stackCount,
-                IngestCount = ingestCount,
-                TotalNutrition = totalNutrition,
-                NutritionEntriesBefore = nutritionEntriesBefore,
-                IngredientsBefore = ingredientsBefore
+                IsDrug = isSupportedDrug, // Bool to track if current ingestion is a food or drug item.
 
+                Pawn = chewer, // The pawn who is eating the food.
+
+                ObjectTrackerDef = trackerDef, // The FoodTracker def.
+
+                ObjectDef = obj.def, // The actual def of the food being eaten, which may be a FoodTracker ingest job.
+
+                ObjectGameDef = FoodTrackingHelpers.GetOriginalDef(obj.def), // We use normal meal defs for drug effect calculations.
+
+                PreStackCount = obj.stackCount, // The stack count of the food when the job starts.
+
+                IngestCount = curJob.count, // The number of items the pawn is attempting to eat in this job.
+
+                TotalFraction = totalFraction, // The sum of individual fractions in this ingestion job.
+
+                RemainingFractionsBefore = remainingFractionsBefore, // The nutrition entries of the food before ingestion, if it is a FoodTracker ingest job.
+
+                IngredientsBefore = ingredientsBefore  // The ingredients of the food before ingestion, if it has a CompIngredients component.
             };
 
-            // Batch foods don't carry a component, this scales eating duration off total nutrition eaten.
-            if (FoodTrackingHelpers.IsBatchFood(food.def))
+            float minimumMultiplier = 40f / obj.def.ingestible.baseIngestTicks;
+
+            // Eating duration is based on the actual total amount being consumed.
+            if (tracker != null)
             {
-                durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
-
-                if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker][T{__state.TraceID}] Eating duration: {food.def.defName} (ID {food.thingIDNumber}) " +
-                        $"| Ingest Count: {ingestCount} | Total Nutrition: {__state.TotalNutrition:F2} | Multiplier: {durationMultiplier:P0}");
-
-                return;
+                durationMultiplier *= Mathf.Max(minimumMultiplier, __state.TotalFraction);
+            }
+            else
+            {
+                // Full non-FoodTracker drug. Multiplier remains 1 unless vanilla has another modifier.
             }
 
-            ThingDef trackerDef = DynamicMealDefFactory.CreateTrackerMeal(food.def);
-
-            __state.TrackerDef = trackerDef;
-            __state.NutritionPerItem = nutritionPerItem;
-
-            // Eating duration is based on the actual total nutrition being consumed.
-            durationMultiplier *= Mathf.Max(0.01f, __state.TotalNutrition / 0.9f);
+            __state.TotalTicks = Mathf.RoundToInt((float)obj.def.ingestible.baseIngestTicks * durationMultiplier);
 
             if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{__state.TraceID}] Eating duration: {food.def.defName} (ID {food.thingIDNumber}) " +
-                    $"| Ingest Count: {ingestCount} | Total Nutrition: {__state.TotalNutrition:F2} | Multiplier: {durationMultiplier:P0}");
+                Log.Message($"[FoodTracker][T{__state.TraceID}] ChewIngestible Prefix completed: {obj.def.defName} (ID {obj.thingIDNumber}) " +
+                    $"| Starting Stack Count: {__state.PreStackCount} | Ingest Count: {ingestCount} | Multiplier: {durationMultiplier:P0}");
 
         }
 
@@ -126,130 +139,160 @@ namespace FoodTracker
             IngestionState state = __state;
             Toil toil = __result;
 
-            // Save vanilla's existing tick action.
-            Action<int> originalTickAction = toil.tickIntervalAction;
-
-            // Wrap vanilla's tick action.
-            toil.tickIntervalAction = delta =>
-            {
-                // ALWAYS let vanilla run first.
-                originalTickAction?.Invoke(delta);
-
-                // If initialization hasn't succeeded, nothing for us to do.
-                if (state.TotalTicks <= 0)
-                    return;
-
-                // Read vanilla's actual timer.
-                int ticksLeft = chewer.jobs?.curDriver?.ticksLeftThisToil ?? 0;
-
-                state.EatenFraction = Mathf.Clamp01(1f - ((float)ticksLeft / state.TotalTicks));
-            };
-
+            // Save vanilla's existing init action.
             Action originalInit = toil.initAction;
 
             toil.initAction = () =>
             {
-                // First: let vanilla initialize the toil exactly as normal.
+                // Let vanilla initialize the toil exactly as normal.
                 originalInit?.Invoke();
 
-                // Capture ticks immediately after Toil Init then capture food and job.
-                int totalTicks = Mathf.Max(1, chewer.jobs.curDriver.ticksLeftThisToil);
-                Job curJob = chewer.CurJob;
-                Thing food = chewer.CurJob?.GetTarget(ingestibleInd).Thing;
+                state.StartTick = Find.TickManager.TicksGame; // Get starting tick to calculate if eating has ended.
+
+                Thing obj = chewer.CurJob?.GetTarget(ingestibleInd).Thing;
 
                 // Finish populating the state.
-                state.Food = food;
-                state.HungerAtStart = chewer.needs.food.CurLevel;
-                state.FoodCell = chewer.Position;
-                state.TotalTicks = totalTicks;
+                state.PostIngestObject = obj; // The food object(s) in the pawns hands/on the ground during interruption. This may be .Destroyed if the pawn is interrupted while drafted.
+
+                state.ThingID = obj.thingIDNumber;
 
                 FoodTrackerIngestionTracker.Register(state);
 
-                if (FoodTrackerSettings.Verbose && food.TryGetComp<CompFoodTracker>() == null)
-                {
-                    Log.Message($"[FoodTracker][T{state.TraceID}] Eating started: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
-                        $"| Pawn: {state.Pawn} | Ingest Count: {state.IngestCount} | Total Nutrition: {state.TotalNutrition:F2}");
+                // If the food has a FoodTracker component.
+                if (FoodTrackerSettings.Verbose)
+                    Log.Message($"[FoodTracker][T{state.TraceID}] Eating started: {state.ObjectDef.defName} (ID {state.PostIngestObject.thingIDNumber}) " +
+                        $"| Pawn: {state.Pawn} | Ingest Count: {state.IngestCount} | Total Fraction: {state.TotalFraction:F2}");
 
-                    return;
-                }
+            };
+        }
+    }
+
+    // Patch for JobTracker cleanup where we detect if the job was interrupted.
+    [HarmonyPatch(typeof(Pawn_JobTracker), "CleanupCurrentJob", typeof(JobCondition), typeof(bool), typeof(bool), typeof(bool), typeof(bool))]
+    public static class JobDriver_IngestCleanupPatch
+    {
+        public static void Prefix(Pawn ___pawn, JobCondition condition)
+        {
+
+            if (___pawn == null)
+                return;
+
+            bool tryget = FoodTrackerIngestionTracker.TryGet(___pawn, out IngestionState state);
+
+            if (tryget == false)
+                return;
+
+            // Calculate elapsed ticks since toil started and fraction of food eaten.
+            int elapsedTicks = Find.TickManager.TicksGame - state.StartTick;
+            state.IngestedFraction = Mathf.Clamp01((float)elapsedTicks / state.TotalTicks);
+
+            if (condition == JobCondition.Succeeded)
+            {
+                // How much should have been applied.
+                float consumedFraction = state.TotalFraction * state.IngestedFraction;
+
+                FoodTrackerIngestionTracker.Remove(state.Pawn);
 
                 if (FoodTrackerSettings.Verbose)
-                    Log.Message($"[FoodTracker][T{state.TraceID}] Eating started: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
-                        $"| Pawn: {state.Pawn} | Ingest Count: {state.IngestCount} | Available Nutrition: {state.TotalNutrition:F2}");
-            };
+                    Log.Message($"[FoodTracker][T{state.TraceID}] Eating Completed: {state.ObjectDef.defName} (ID {state.PostIngestObject.thingIDNumber}) " +
+                        $"| How much should have been applied: {consumedFraction:F2}");
 
-            toil.AddFinishAction(() =>
+                return;
+            }
+
+            if (state.HandlingInterruption)
             {
-                if (state == null)
-                    return;
+                Log.Warning($"[FoodTracker][T{state.TraceID}] Reentrant interruption detected. Ignoring nested Cleanup call.");
+                return;
+            }
 
-                if (state.Finalized)
-                {
-                    // Ingestion has completed
-                    FoodTrackerIngestionTracker.Remove(chewer);
-                    return;
-                }
+            state.HandlingInterruption = true;
 
-                // ChewIngestible ended without FinalizeIngest. Before treating this as an interruption.  Check if fraction of food eaten, 
-                // exceeds 99%. This protects vanilla's Thing lifecycle from our replacement logic when the two systems are out of sync.
+            // If job condition has not suceeded and our tracker exists this is a genuine interruption.
+            IngestionInterruptionHandler.Handle(state);
 
-                if (state.EatenFraction >= FoodTrackingHelpers.MealCompletionThreshold)
-                {
-                    // Effectively completed don't interfere with vanilla.
-                    FoodTrackerIngestionTracker.Remove(chewer);
-                    return;
-                }
+            // Check if any food is scheduled for destruction.
+            if (state.DestroyFoodAfterIngestion && state.ThingsToDestroy != null)
+                DeferredFoodDestruction.Schedule(state.ThingsToDestroy);
 
-                // ChewIngestible ended before the completion threshold and FinalizeIngest did not happen. Treat this as a genuine interruption.
-                IngestionInterruptionHandler.Handle(state);
+            state.HandlingInterruption = false;
 
-                // At this point the interruption handler has finished all
-                // synchronization and has marked any empty Thing for destruction.
-                if (state.DestroyFoodAfterIngestion && state.FoodToDestroy != null)
-                {
-                    DeferredFoodDestruction.Schedule(state.FoodToDestroy);
-                }
-
-                FoodTrackerIngestionTracker.Remove(chewer);
-            });
+            FoodTrackerIngestionTracker.Remove(___pawn);
         }
     }
 
-    // Tries to get state from our dictionary, if one is found mark state.Finalized true and begin our completion handler.
-    [HarmonyPatch(typeof(Toils_Ingest), nameof(Toils_Ingest.FinalizeIngest))]
-    public static class FinalizeIngestPatch
+
+    [HarmonyPatch(typeof(Thing), "IngestedCalculateAmounts")]
+    public static class Thing_IngestedCalculateAmounts_Patch
     {
-        public static void Postfix(Pawn ingester)
+        [HarmonyPostfix]
+        public static void Postfix(Thing __instance, Pawn ingester, float nutritionWanted, ref int numTaken, ref float nutritionIngested)
         {
-            if (!FoodTrackerIngestionTracker.TryGet(ingester, out IngestionState state))
+
+            if (ingester == null || __instance == null)
                 return;
 
-            state.Finalized = true;
-            IngestionCompletionHandler.Handle(state);
+            float nutrition = FoodUtility.NutritionForEater(ingester, __instance);
+            CompFoodTracker tracker = __instance.TryGetComp<CompFoodTracker>();
+
+            if (tracker == null)
+                return;
+
+            CompFoodTrackerUtility.NormalizeState(__instance);
+
+            float totalFractions = 0f;
+            float totalNutrition = 0f;
+            int itemsToRemove = 0;
+
+            if (tracker.RemainingFractions.Count > 0 && itemsToRemove < numTaken)
+            {
+                for (int i = 0; i < tracker.RemainingFractions.Count && itemsToRemove < numTaken; i++)
+                {
+                    totalFractions += tracker.RemainingFractions[i];
+                    totalNutrition = totalFractions * nutrition;
+
+                    itemsToRemove++;
+                }
+            }
+            else
+            {
+                totalFractions = tracker.PartialFraction;
+                totalNutrition = totalFractions * nutrition;
+
+                itemsToRemove++;
+            }
+
+            if (numTaken > itemsToRemove)
+            {
+                numTaken = itemsToRemove;
+            }
+
+            nutritionIngested = totalNutrition;
+
+            return;
         }
     }
 
-    // Final completion handler to apply any corrections to nutrition after a meal is finished.
-    public static class IngestionCompletionHandler
+    [HarmonyPatch]
+    public static class TryDropPatch
     {
-        public static void Handle(IngestionState state)
+        static MethodBase TargetMethod()
         {
+            return AccessTools.Method(typeof(ThingOwner), nameof(ThingOwner.TryDrop), new Type[] { typeof(Thing), typeof(IntVec3), typeof(Map),
+            typeof(ThingPlaceMode), typeof(Thing).MakeByRefType(), typeof(Action<Thing, int>), typeof(Predicate<IntVec3>), typeof(bool)});
+        }
 
-            // If food doesn't carry our component there is nothing to change.
-            if (state?.Food?.TryGetComp<CompFoodTracker>() == null)
-                return;
+        public static bool Prefix(Thing thing)
+        {
+            // Only intercept this exact Thing if it is actively being ingested.
+            if (FoodTrackerIngestionTracker.IsBeingIngested(thing, out IngestionState state))
+            {
+                return false;
+            }
 
-            // Calculate correction based off how mnuch nutrition should be applied, and how mucn was applied.
-            float vanillaNutritionAdded = state.Pawn.needs.food.CurLevel - state.HungerAtStart;
-            float trueNutritionConsumed = state.TotalNutrition;
-            float correction = trueNutritionConsumed - vanillaNutritionAdded;
-
-            FoodTrackingHelpers.ApplyNutritionToPawn(state, correction);
-
-            if (FoodTrackerSettings.Verbose)
-                Log.Message($"[FoodTracker][T{state.TraceID}] Eating Completed: {state.FoodDef.defName} (ID {state.Food.thingIDNumber}) " +
-                    $"| Nutrition Consumed: {trueNutritionConsumed:F2} | Vanilla Added: {vanillaNutritionAdded:F2} " +
-                    $"| Correction Applied: {correction:F2}");
+            // We aren't intercepting.
+            return true;
         }
     }
 }
+

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using Verse;
+using static RimWorld.FleshTypeDef;
 
 namespace FoodTracker
 {
@@ -9,36 +10,35 @@ namespace FoodTracker
     {
         // Internal ID to track each ingestion.
         public int TraceID;
-        public List<float> NutritionEntriesBefore;
+        public bool HandlingInterruption;
+        public List<float> RemainingFractionsBefore;
         public List<ThingDef> IngredientsBefore;
+        public List<Thing> ThingsToDestroy = new List<Thing>();
 
         // Captured during Prefix while the Food Thing is still reliable.
         public Pawn Pawn;
-        public Thing Food;
-        public ThingDef FoodDef;
-        public ThingDef BaseDef;
-        public ThingDef TrackerDef;
-        public int StartingStackCount;
+        public bool IsDrug;
+        public Thing PostIngestObject;
+        public ThingDef ObjectDef;
+        public ThingDef ObjectGameDef;
+        public ThingDef ObjectTrackerDef;
         public int IngestCount;
-        public float TotalNutrition;
-        public float NutritionPerItem;
+        public int PreStackCount;
+        public int ThingID;
+        public float TotalFraction;
 
         // Captured after vanilla initializes the toil.
+        public int StartTick;
         public int TotalTicks;
-        public float HungerAtStart;
-        public IntVec3 FoodCell;
 
         // Runtime state.
-        public float EatenFraction;
-        public bool Finalized;
+        public float IngestedFraction;
         public bool DestroyFoodAfterIngestion;
-        public Thing FoodToDestroy;
     }
 
     public static class FoodTrackerIngestionTracker
     {
-        private static readonly Dictionary<Pawn, IngestionState> active =
-            new Dictionary<Pawn, IngestionState>();
+        private static readonly Dictionary<Pawn, IngestionState> active = new Dictionary<Pawn, IngestionState>();
 
         public static void Register(IngestionState state)
         {
@@ -50,13 +50,32 @@ namespace FoodTracker
 
         public static bool TryGet(Pawn pawn, out IngestionState state)
         {
-            return active.TryGetValue(pawn, out state);
+            bool found = active.TryGetValue(pawn, out state);
+
+            return found;
         }
 
         public static void Remove(Pawn pawn)
         {
             if (pawn != null)
                 active.Remove(pawn);
+        }
+
+
+        public static bool IsBeingIngested(Thing thing, out IngestionState state)
+        {
+            state = null;
+            if (thing == null) return false;
+
+            foreach (var kvp in active)
+            {
+                if (kvp.Value != null && kvp.Value.ThingID == thing.thingIDNumber)
+                {
+                    state = kvp.Value;
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

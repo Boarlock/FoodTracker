@@ -235,6 +235,7 @@ _pkginfo.txt
 
 # Others
 ClientBin/
+Experiments/
 ~$*
 *~
 *.dbmdl
@@ -310,6 +311,9 @@ _Pvt_Extensions
 # Paket dependency manager
 .paket/paket.exe
 paket-files/
+
+# Dependencies
+Lib/
 
 # FAKE - F# Make
 .fake/
