@@ -11,6 +11,62 @@ using Verse;
 
 namespace FoodTracker
 {
+    
+    public static class CaravanPatch
+    {
+        // Primary lookup: Maps each TransferableOneWay to its underlying Thing instances
+        public static Dictionary<TransferableOneWay, List<Thing>> trackedTransferables = new Dictionary<TransferableOneWay, List<Thing>>();
+
+        // Registers or updates a Thing under its corresponding TransferableOneWay.
+        public static void Track(TransferableOneWay transferable, Thing thing)
+        {
+
+            if (transferable == null || thing == null)
+                return;
+
+            CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
+
+            if (tracker == null)
+                return;
+
+            // Get or initialize the Thing list for this transferable
+            if (!trackedTransferables.TryGetValue(transferable, out List<Thing> things))
+            {
+                things = new List<Thing>();
+                trackedTransferables.Add(transferable, things);
+                Log.Message($"[FoodTracker] Track | Created NEW Transferable tracking bucket for: {transferable.ThingDef?.defName}");
+            }
+
+            // Prevent duplicate tracking if AddToTransferables fires twice for the same Thing reference
+            if (things.Contains(thing))
+            {
+                Log.Message($"[FoodTracker] Track | Thing Already Registered: {thing.def} (ID: {thing.thingIDNumber}");
+
+                return;
+            }
+
+            things.Add(thing);
+        }
+
+        // Resets tracking data when a caravan dialog opens or rebuilds.
+        public static void Clear()
+        {
+            trackedTransferables.Clear();
+
+            Log.Message("[FoodTracker] Tracking dictionary cleared for fresh caravan session.");
+        }
+    }
+
+    class FTFoodTotal
+    {
+        public int Total;
+        public float TotalFractions;
+
+        public FTFoodTotal Clone()
+        {
+            return (FTFoodTotal)this.MemberwiseClone();
+        }
+    }
 
     [HarmonyPatch(typeof(DaysWorthOfFoodCalculator), "ApproxDaysWorthOfFood", new[] { typeof(List<Pawn>), typeof(List<ThingDefCount>), typeof(PlanetTile),
         typeof(IgnorePawnsInventoryMode), typeof(Faction), typeof(WorldPath), typeof(float), typeof(int), typeof(bool)})]
@@ -605,71 +661,31 @@ namespace FoodTracker
         }
     }
 
-    /*[HarmonyPatch(typeof(CollectionsMassCalculator))]
-    public static class CaravanPatch_MassUsage
+    [HarmonyPatch]
+    public static class MultiDialog_RecachePatch
     {
-        // Target both overloads.
-        [HarmonyPatch(nameof(CollectionsMassCalculator.MassUsage), new[] { typeof(List<ThingCount>), typeof(IgnorePawnsInventoryMode), typeof(bool), typeof(bool) })]
-        [HarmonyPatch(nameof(CollectionsMassCalculator.MassUsage), new[] { typeof(ThingOwner), typeof(IgnorePawnsInventoryMode), typeof(bool), typeof(bool) })]
-
-        // Replace the Mass stat calculation with our fractional-mass contribution.
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> PatchMassUsage(IEnumerable<CodeInstruction> instructions, MethodBase __originalMethod)
+        // Dynamically return all recalculation methods across RimWorld caravan/transfer dialogs
+        public static IEnumerable<MethodBase> TargetMethods()
         {
-            // Bool to track which overload we're on.
-            bool isThingCountOverload = __originalMethod.GetParameters()[0].ParameterType == typeof(List<ThingCount>);
-
-            int thingLocal = isThingCountOverload ? 3 : 2;
-            int countLocal = isThingCountOverload ? 2 : 3;
-
-            // Create target method and target field for transpiler splice.
-            MethodInfo statValue = AccessTools.Method(typeof(StatExtension), nameof(StatExtension.GetStatValue), new[] { typeof(Thing), typeof(StatDef), typeof(bool), typeof(int) });
-            FieldInfo massFieldInfo = AccessTools.Field(typeof(RimWorld.StatDefOf), "Mass");
-
-            var codes = new List<CodeInstruction>(instructions);
-
-            for (int i = 1; i < codes.Count - 7; i++)
+            Type[] targetTypes = new[]
             {
+            typeof(Dialog_FormCaravan),
+            typeof(Dialog_SplitCaravan),
+            typeof(Dialog_EnterPortal),
+            typeof(Dialog_LoadTransporters)
+            };
 
-                // OLD C#: num += thing.GetStatValue(StatDefOf.Mass) * (float)count;
-                // NEW C#: num += CaravanPatch.GetActualMassContribution(thing, count);
-                if (codes[i + 3].Calls(statValue) && codes[i].LoadsField(massFieldInfo) && LoadsTargetLocal(codes[i - 1], thingLocal))
-                {
-
-                    // Replace IL_0083/IL_0074: (ldsfld) .StatDefOf::Mass with ldloc.2/ldloc.3.
-                    codes[i] = CodeInstruction.LoadLocal(countLocal);
-
-                    // Replace IL_0088/IL_0079: (ldc.i4.1) with .Call our method.
-                    codes[i + 1] = CodeInstruction.Call(typeof(CaravanPatch), nameof(CaravanPatch.GetActualMassContribution));
-
-                    // Remove IL_0089/IL_007a, IL_008a/IL_007b, IL_008f/IL_0080, IL_0090/IL_0081, IL_0091/IL_0082.
-                    codes.RemoveRange((i + 2), 5);
-                    break;
-                }
+            foreach (Type type in targetTypes)
+            {
+                yield return AccessTools.Method(type, "CalculateAndRecacheTransferables");
             }
-            return codes;
         }
 
-        private static bool LoadsTargetLocal(CodeInstruction instruction, int localIndex)
+        [HarmonyPrefix]
+        public static void Prefix()
         {
-            if (localIndex == 2)
-                return instruction.opcode == OpCodes.Ldloc_2;
-
-            if (localIndex == 3)
-                return instruction.opcode == OpCodes.Ldloc_3;
-
-            return false;
-        }
-    }*/
-
-    class FTFoodTotal
-    {
-        public int Total;
-        public float TotalFractions;
-
-        public FTFoodTotal Clone()
-        {
-            return (FTFoodTotal)this.MemberwiseClone();
+            // Safe to clear before any of these dialogs rebuild their transferables
+            CaravanPatch.trackedTransferables.Clear();
         }
     }
 
@@ -679,8 +695,7 @@ namespace FoodTracker
         // Dynamically specify the exact generic instantiation: TransferableMatching<TransferableOneWay>
         public static MethodBase TargetMethod()
         {
-            MethodInfo genericMethod = typeof(TransferableUtility)
-                .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            MethodInfo genericMethod = typeof(TransferableUtility).GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .FirstOrDefault(m => m.Name == nameof(TransferableUtility.TransferableMatching) && m.IsGenericMethod);
 
             return genericMethod?.MakeGenericMethod(typeof(TransferableOneWay));
@@ -694,110 +709,6 @@ namespace FoodTracker
 
             // Auto-track the Thing under its matched TransferableOneWay
             CaravanPatch.Track(__result, thing);
-        }
-    }
-
-    [HarmonyPatch]
-    public static class MultiDialog_Recache_Patch
-    {
-        // Dynamically return all recalculation methods across RimWorld caravan/transfer dialogs
-        public static IEnumerable<MethodBase> TargetMethods()
-        {
-            yield return AccessTools.Method(typeof(Dialog_FormCaravan), "CalculateAndRecacheTransferables");
-
-            Type splitDialog = AccessTools.TypeByName("RimWorld.Planet.Dialog_SplitCaravan");
-            if (splitDialog != null)
-                yield return AccessTools.Method(splitDialog, "CalculateAndRecacheTransferables");
-
-            Type portalDialog = AccessTools.TypeByName("RimWorld.Dialog_EnterPortal");
-            if (portalDialog != null)
-                yield return AccessTools.Method(portalDialog, "CalculateAndRecacheTransferables");
-
-            Type transporterDialog = AccessTools.TypeByName("RimWorld.Dialog_LoadTransporters");
-            if (transporterDialog != null)
-                yield return AccessTools.Method(transporterDialog, "CalculateAndRecacheTransferables");
-        }
-
-        [HarmonyPrefix]
-        public static void Prefix()
-        {
-            // Safe to clear before any of these dialogs rebuild their transferables
-            CaravanPatch.trackedTransferables.Clear();
-        }
-    }
-
-
-    public static class CaravanPatch
-    {
-        // Primary lookup: Maps each TransferableOneWay to its underlying Thing instances
-        public static Dictionary<TransferableOneWay, List<Thing>> trackedTransferables = new Dictionary<TransferableOneWay, List<Thing>>();
-
-        // Resets tracking data when a caravan dialog opens or rebuilds.
-        public static void Clear()
-        {
-            trackedTransferables.Clear();
-
-            Log.Message("[FoodTracker] Tracking dictionary cleared for fresh caravan session.");
-        }
-
-        // Registers or updates a Thing under its corresponding TransferableOneWay.
-        public static void Track(TransferableOneWay transferable, Thing thing)
-        {
-
-            if (transferable == null || thing == null)
-                return;
-
-            CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
-
-            if (tracker == null)
-                return;
-
-            // Get or initialize the Thing list for this transferable
-            if (!trackedTransferables.TryGetValue(transferable, out List<Thing> things))
-            {
-                things = new List<Thing>();
-                trackedTransferables.Add(transferable, things);
-                Log.Message($"[FoodTracker] Track | Created NEW Transferable tracking bucket for: {transferable.ThingDef?.defName}");
-            }
-
-            // Prevent duplicate tracking if AddToTransferables fires twice for the same Thing reference
-            if (things.Contains(thing))
-            {
-                Log.Message($"[FoodTracker] Track | Thing Already Registered: {thing.def} (ID: {thing.thingIDNumber}");
-
-                return;
-            }
-        }
-
-        public static float GetActualMassContribution(Thing thing, int count)
-        {
-            CompFoodTracker tracker = thing.TryGetComp<CompFoodTracker>();
-            float fullMass = 0f;
-
-            if (tracker == null)
-            {
-                // Exact vanilla calculation.
-                fullMass = StatExtension.GetStatValue(thing, StatDefOf.Mass, true, -1);
-
-                return fullMass * count;
-            }
-
-            fullMass = StatExtension.GetStatValue(thing, StatDefOf.Mass, true, -1);
-
-            if (tracker.RemainingFractions.Count <= 0)
-            {
-                return tracker.PartialFraction > 0f ? fullMass * tracker.PartialFraction : 0f;
-            }
-
-            float totalMass = 0f;
-            int limit = Mathf.Min(count, tracker.RemainingFractions.Count);
-
-            for (int i = 0; i < limit; i++)
-            {
-                totalMass += fullMass * tracker.RemainingFractions[i];
-            }
-
-            return totalMass;
         }
     }
 }
