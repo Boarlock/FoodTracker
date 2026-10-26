@@ -1,11 +1,11 @@
 {"header" : {
   "cloc_url"           : "github.com/AlDanial/cloc",
   "cloc_version"       : "1.98",
-  "elapsed_seconds"    : 0.0780630111694336,
+  "elapsed_seconds"    : 0.0426950454711914,
   "n_files"            : 88,
   "n_lines"            : 18359,
-  "files_per_second"   : 1127.29445971535,
-  "lines_per_second"   : 235181.806658115,
+  "files_per_second"   : 2061.12908485783,
+  "lines_per_second"   : 430003.055328464,
   "report_file"        : "../output/cloc-output.json"},
 "C#" :{
   "nFiles": 75,
